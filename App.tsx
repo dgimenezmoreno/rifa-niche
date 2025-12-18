@@ -165,7 +165,12 @@ const App: React.FC = () => {
             setTimeLeft(prev => {
                 const newVal = prev - 1;
                 broadcast({ type: 'TIMER_UPDATE', timeLeft: newVal });
-                if (newVal <= 0) { clearInterval(interval); setPhase(AppPhase.ROUND_LOCKED); broadcast({ type: 'PHASE_CHANGE', phase: AppPhase.ROUND_LOCKED }); return 0; }
+                if (newVal <= 0) { 
+                  clearInterval(interval); 
+                  setPhase(AppPhase.ROUND_LOCKED); 
+                  broadcast({ type: 'PHASE_CHANGE', phase: AppPhase.ROUND_LOCKED }); 
+                  return 0; 
+                }
                 return newVal;
             });
         }, 1000);
@@ -215,28 +220,33 @@ const App: React.FC = () => {
 
   const handleAdminReveal = (giftId: string) => {
     if (!user.isAdmin) return;
-    if (phase !== AppPhase.ROUND_REVEAL) { setPhase(AppPhase.ROUND_REVEAL); broadcast({ type: 'PHASE_CHANGE', phase: AppPhase.ROUND_REVEAL }); }
+    if (phase !== AppPhase.ROUND_REVEAL) { 
+      setPhase(AppPhase.ROUND_REVEAL); 
+      broadcast({ type: 'PHASE_CHANGE', phase: AppPhase.ROUND_REVEAL }); 
+    }
     setGifts(prev => {
       const idx = prev.findIndex(g => g.id === giftId);
       const updated = [...prev];
       const gift = { ...updated[idx] };
       if (!gift.isContentRevealed) gift.isContentRevealed = true;
-      else if (!gift.isWinnerRevealed) { gift.winners = selectWinners(gift, gift.packs, allWinners); gift.isWinnerRevealed = true; }
+      else if (!gift.isWinnerRevealed) { 
+        gift.winners = selectWinners(gift, gift.packs, allWinners); 
+        gift.isWinnerRevealed = true; 
+      }
       updated[idx] = gift;
       broadcast({ type: 'GIFT_UPDATE', gift });
       return updated;
     });
   };
 
-  // Fix: Define currentGift derived state to resolve errors on lines 327, 329, 330, 345, 353, 354, and 355
   const currentGift = gifts[currentRoundIndex];
 
-  // Fix: Implement missing handlers for component interaction
   const handleAllocate = (giftId: string, amount: number) => {
     if (phase !== AppPhase.ROUND_ACTIVE) return;
     if (amount > 0 && user.remainingPoints <= 0) return;
     
-    const currentAlloc = gifts.find(g => g.id === giftId)?.allocations.find(a => a.userName === user.name);
+    const targetGift = gifts.find(g => g.id === giftId);
+    const currentAlloc = targetGift?.allocations.find(a => a.userName === user.name);
     if (amount < 0 && (!currentAlloc || currentAlloc.points <= 0)) return;
 
     handleIncomingBet(giftId, user.name, amount);
@@ -263,7 +273,6 @@ const App: React.FC = () => {
   const handleNextRound = () => {
     if (currentRoundIndex + 1 < gifts.length) {
       const nextIndex = currentRoundIndex + 1;
-      // Check if this round should trigger an automatic mini-game event
       if (TRIGGER_INDICES.includes(nextIndex)) {
         const eventType = AUTO_EVENTS[TRIGGER_INDICES.indexOf(nextIndex)];
         const newEvent: EventState = { type: eventType, step: 'STORY' };
@@ -343,7 +352,6 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-black text-white flex flex-col">
-      {/* Fix: Pass implemented handlers to EventOverlay component */}
       {eventState && <EventOverlay eventState={eventState} isAdmin={user.isAdmin} participants={participants} onSpinRoulette={handleSpinRoulette} onResolve={handleResolveEvent} />}
       
       <header className="bg-white text-black px-8 py-6 flex items-center justify-between shrink-0 border-b-[6px] border-black">
@@ -357,18 +365,41 @@ const App: React.FC = () => {
           </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center p-8">
+      <main className="flex-1 flex flex-col items-center justify-center p-8 overflow-hidden">
           {phase === AppPhase.WAITING ? (
-              <div className="w-full max-w-6xl flex flex-col lg:flex-row gap-12 items-center">
-                  <div className="flex-1 bg-black border-[6px] border-white p-16 text-center">
+              <div className="w-full max-w-7xl flex flex-col lg:flex-row gap-8 items-stretch h-full">
+                  <div className="flex-1 bg-black border-[6px] border-white p-16 text-center flex flex-col justify-center">
                       <span className="text-xl font-black uppercase tracking-[0.5em] text-white/40 block mb-6">Código de Acceso</span>
                       <h2 className="text-[160px] font-black leading-none mb-10">{roomCode}</h2>
+                      <div className="flex justify-center mb-10">
+                         <div className="w-64 h-64 bg-white p-4 border-[6px] border-white">
+                            <img src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(window.location.href)}`} className="w-full h-full" alt="QR"/>
+                         </div>
+                      </div>
                       {user.isAdmin && (
                         <button onClick={handleStartGame} className="w-full bg-white text-black py-10 text-3xl font-black uppercase border-[6px] border-white">Empezar Sorteo</button>
                       )}
                   </div>
-                  <div className="w-80 h-80 bg-white p-4 border-[6px] border-white">
-                      <img src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(window.location.href)}`} className="w-full h-full" alt="QR"/>
+                  
+                  {/* Recuento de participantes para el Lobby */}
+                  <div className="w-full lg:w-96 bg-black border-[6px] border-white p-8 flex flex-col">
+                      <div className="flex justify-between items-center mb-6 border-b-[3px] border-white pb-4">
+                         <span className="text-xl font-black uppercase">Participantes</span>
+                         <span className="bg-white text-black px-3 py-1 font-black text-2xl">{participants.length}</span>
+                      </div>
+                      <div className="flex-1 overflow-y-auto custom-scrollbar space-y-3">
+                         {participants.filter(p => p !== 'Root Admin').map((p, i) => (
+                            <div key={i} className="border-[3px] border-white p-4 font-black uppercase text-lg text-white">
+                               {p}
+                            </div>
+                         ))}
+                         {participants.filter(p => p !== 'Root Admin').length === 0 && (
+                            <div className="h-full flex flex-col items-center justify-center opacity-20 text-center">
+                               <Users size={48} className="mb-4" />
+                               <span className="font-black uppercase tracking-widest text-sm">Esperando terminales...</span>
+                            </div>
+                         )}
+                      </div>
                   </div>
               </div>
           ) : phase === AppPhase.LOADING_GIFTS ? (
@@ -378,7 +409,6 @@ const App: React.FC = () => {
               </div>
           ) : (
              <div className="w-full h-full">
-                {/* Fix: Use currentGift derived state to resolve errors on lines 327, 329, 330 */}
                 {currentGift && (
                   <GiftCard 
                     gift={currentGift} 
@@ -397,13 +427,16 @@ const App: React.FC = () => {
           )}
       </main>
 
-      {/* Fix: Use currentGift and implemented logic to resolve errors on lines 345, 353, 354, 355 */}
       {user.isAdmin && currentGift && (
         <footer className="bg-white text-black p-6 border-t-[6px] border-black flex justify-between items-center">
             <div className="text-2xl font-black uppercase">Lote {(currentRoundIndex + 1)} de {gifts.length}</div>
             <div className="flex gap-4">
-                {phase === AppPhase.ROUND_WAITING && <button onClick={() => setPhase(AppPhase.ROUND_ACTIVE)} className="bg-black text-white px-10 py-4 font-black uppercase text-xl">Abrir Rifa</button>}
-                {phase === AppPhase.ROUND_ACTIVE && <button onClick={() => setPhase(AppPhase.ROUND_LOCKED)} className="bg-black text-white px-10 py-4 font-black uppercase text-xl">Cerrar Rifa</button>}
+                {phase === AppPhase.ROUND_WAITING && (
+                  <button onClick={() => { setPhase(AppPhase.ROUND_ACTIVE); broadcast({ type: 'PHASE_CHANGE', phase: AppPhase.ROUND_ACTIVE }); }} className="bg-black text-white px-10 py-4 font-black uppercase text-xl">Abrir Rifa</button>
+                )}
+                {phase === AppPhase.ROUND_ACTIVE && (
+                  <button onClick={() => { setPhase(AppPhase.ROUND_LOCKED); broadcast({ type: 'PHASE_CHANGE', phase: AppPhase.ROUND_LOCKED }); }} className="bg-black text-white px-10 py-4 font-black uppercase text-xl">Cerrar Rifa</button>
+                )}
                 {(phase === AppPhase.ROUND_LOCKED || phase === AppPhase.ROUND_REVEAL) && (
                     <div className="flex gap-4">
                         {!currentGift.isContentRevealed && <button onClick={() => handleAdminReveal(currentGift.id)} className="bg-black text-white px-10 py-4 font-black uppercase text-xl">Revelar Contenido</button>}

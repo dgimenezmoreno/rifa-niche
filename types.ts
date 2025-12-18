@@ -7,7 +7,7 @@ export enum AppPhase {
   ROUND_ACTIVE = 'ROUND_ACTIVE',
   ROUND_LOCKED = 'ROUND_LOCKED',
   ROUND_REVEAL = 'ROUND_REVEAL',
-  EVENT_NARRATIVE = 'EVENT_NARRATIVE', // Nueva fase unificada para eventos por pasos
+  EVENT_NARRATIVE = 'EVENT_NARRATIVE',
   FINISHED = 'FINISHED'
 }
 
@@ -55,7 +55,6 @@ export type BroadcastEvent =
   | { type: 'TIMER_UPDATE'; timeLeft: number }
   | { type: 'ROUND_CHANGE'; roundIndex: number }
   | { type: 'SYNC_REQUEST' } 
-  // Added eventState to SYNC_RESPONSE to match usage in App.tsx
   | { type: 'SYNC_RESPONSE'; phase: AppPhase; gifts: Gift[]; participants: string[]; currentRoundIndex: number; timeLeft: number; eventState?: EventState }
   | { type: 'EVENT_RESOLVED'; success: boolean }
   | { type: 'EVENT_STEP_UPDATE'; eventState: EventState };

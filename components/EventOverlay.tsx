@@ -1,11 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { EventState, EventType } from '../types';
-// Added Activity to the imports below
+import { EventState } from '../types';
 import { 
-  AlertTriangle, Utensils, Ghost, RotateCcw, 
-  CheckCircle2, XCircle, ArrowRight, Loader2, Sparkles,
-  ShieldAlert, Activity
+  Utensils, Sparkles, ShieldAlert, Activity
 } from 'lucide-react';
 
 interface EventOverlayProps {
@@ -60,7 +57,7 @@ export const EventOverlay: React.FC<EventOverlayProps> = ({
         <p className="text-white text-2xl font-bold uppercase leading-relaxed tracking-wide">
           {isCutlery 
             ? "Se han localizado cubiertos en la cocina. Como nadie asume la responsabilidad, el LAB identificará a un responsable. Si no supera el reto, perderá 1 crédito."
-            : "Alguien ha dejado la puerta de la oficina abierta. Unos intrusos han sustraído 1 crédito de cada persona. Hay una única oportunidad de recuperarlos colectivamente."
+            : "Alguien ha dejado la oficina abierta. Unos intrusos han sustraído 1 crédito de cada persona. Hay una única oportunidad de recuperarlos colectivamente."
           }
         </p>
       </div>
@@ -89,7 +86,6 @@ export const EventOverlay: React.FC<EventOverlayProps> = ({
               </div>
             </div>
           </div>
-
           {!isAnimating && eventState.targetUser && (
             <div className="animate-in zoom-in duration-500 w-full max-w-xl">
                <div className="bg-[#18181b] border-4 border-orange-500/50 p-12 rounded-[50px] mb-12 relative overflow-hidden shadow-2xl">
@@ -98,9 +94,7 @@ export const EventOverlay: React.FC<EventOverlayProps> = ({
                  <h4 className="text-white font-black uppercase tracking-tight text-4xl mb-8 leading-none">{eventState.targetUser}</h4>
                  <div className="h-[2px] w-24 bg-white/10 mx-auto mb-8"></div>
                  <p className="text-white font-black uppercase tracking-[0.3em] text-2xl mb-4">RETO: 3 FLEXIONES</p>
-                 <p className="text-white/40 text-[11px] font-bold uppercase leading-relaxed tracking-widest">
-                   Si el sujeto no las realiza, restaremos 1 crédito de su terminal.
-                 </p>
+                 <p className="text-white/40 text-[11px] font-bold uppercase leading-relaxed tracking-widest">Si el sujeto no las realiza, restaremos 1 crédito de su terminal.</p>
                </div>
                {isAdmin && (
                  <div className="flex gap-6">
@@ -121,9 +115,7 @@ export const EventOverlay: React.FC<EventOverlayProps> = ({
             <div className="space-y-8 mb-4">
               <p className="text-white text-3xl font-black uppercase leading-tight tracking-tight">Sincronización Mental</p>
               <div className="h-[2px] w-20 bg-white/10 mx-auto"></div>
-              <p className="text-white/80 text-lg font-bold uppercase leading-relaxed tracking-wide">
-                Todo el personal debe cerrar los ojos y contar del 1 al 5 en voz alta sin solaparse para estabilizar el sistema.
-              </p>
+              <p className="text-white/80 text-lg font-bold uppercase leading-relaxed tracking-wide">Todo el personal debe cerrar los ojos y contar del 1 al 5 en voz alta sin solaparse para estabilizar el sistema.</p>
             </div>
           </div>
           {isAdmin && (

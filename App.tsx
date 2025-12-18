@@ -20,9 +20,10 @@ const supabase = isSupabaseConfigured ? createClient(SUPABASE_URL, SUPABASE_ANON
 const ROUND_DURATION = 35; 
 const INITIAL_CREDITS = 12;
 
+// Retos en orden: El segundo es ROBBERY (Brecha de Seguridad)
 const AUTO_EVENTS: EventType[] = ['CUTLERY', 'ROBBERY', 'PRESSURE', 'SINGING'];
-// Indices: 2 (Premio 3), 6 (Premio 7), 10 (Premio 11), 14 (Premio 15)
-const TRIGGER_INDICES = [2, 6, 10, 14];
+// Con 16 regalos, repartimos los retos cada 4 rondas aproximadamente
+const TRIGGER_INDICES = [3, 7, 11, 14]; 
 
 const App: React.FC = () => {
   const [phase, setPhase] = useState<AppPhase>(AppPhase.LOGIN);
@@ -38,15 +39,16 @@ const App: React.FC = () => {
   const [timeLeft, setTimeLeft] = useState(ROUND_DURATION);
   const [eventState, setEventState] = useState<EventState | null>(null);
   const [completedEvents, setCompletedEvents] = useState<EventType[]>([]);
+  const [allWinners, setAllWinners] = useState<string[]>([]); 
   
   const supabaseChannelRef = useRef<any>(null);
-  const stateRef = useRef({ phase, gifts, participants, currentRoundIndex, timeLeft, user, eventState, roomCode, completedEvents });
+  const stateRef = useRef({ phase, gifts, participants, currentRoundIndex, timeLeft, user, eventState, roomCode, completedEvents, allWinners });
 
   const currentGift = gifts[currentRoundIndex];
 
   useEffect(() => { 
-    stateRef.current = { phase, gifts, participants, currentRoundIndex, timeLeft, user, eventState, roomCode, completedEvents }; 
-  }, [phase, gifts, participants, currentRoundIndex, timeLeft, user, eventState, roomCode, completedEvents]);
+    stateRef.current = { phase, gifts, participants, currentRoundIndex, timeLeft, user, eventState, roomCode, completedEvents, allWinners }; 
+  }, [phase, gifts, participants, currentRoundIndex, timeLeft, user, eventState, roomCode, completedEvents, allWinners]);
 
   const broadcast = (payload: BroadcastEvent) => {
     if (supabaseChannelRef.current) {
@@ -58,17 +60,17 @@ const App: React.FC = () => {
     }
   };
 
-  const forceGlobalSync = (newParticipants?: string[]) => {
+  const forceGlobalSync = (overrides?: any) => {
     const cs = stateRef.current;
     if (cs.user.isAdmin) {
       broadcast({
         type: 'SYNC_RESPONSE',
-        phase: cs.phase,
-        gifts: cs.gifts,
-        participants: newParticipants || cs.participants,
-        currentRoundIndex: cs.currentRoundIndex,
-        timeLeft: cs.timeLeft,
-        eventState: cs.eventState || undefined
+        phase: overrides?.phase || cs.phase,
+        gifts: overrides?.gifts || cs.gifts,
+        participants: overrides?.participants || cs.participants,
+        currentRoundIndex: overrides?.currentRoundIndex ?? cs.currentRoundIndex,
+        timeLeft: overrides?.timeLeft ?? cs.timeLeft,
+        eventState: overrides?.eventState || cs.eventState || undefined
       });
     }
   };
@@ -86,8 +88,7 @@ const App: React.FC = () => {
         const updatedList = Array.from(new Set([...cs.participants, payload.name]));
         setParticipants(updatedList);
         if (cs.user.isAdmin) {
-            // Admin reacciona a la entrada de un jugador sincronizando a TODOS con la lista nueva
-            forceGlobalSync(updatedList);
+            forceGlobalSync({ participants: updatedList });
         }
         break;
       case 'PLACE_BET':
@@ -95,6 +96,9 @@ const App: React.FC = () => {
         break;
       case 'GIFT_UPDATE':
         setGifts(prev => prev.map(g => g.id === payload.gift.id ? payload.gift : g));
+        if (payload.gift.winners) {
+            setAllWinners(prev => Array.from(new Set([...prev, ...(payload.gift.winners || [])])));
+        }
         break;
       case 'TIMER_UPDATE':
         setTimeLeft(payload.timeLeft);
@@ -105,11 +109,7 @@ const App: React.FC = () => {
         setTimeLeft(ROUND_DURATION);
         break;
       case 'EVENT_RESOLVED':
-        setPhase(AppPhase.ROUND_REVEAL);
-        setEventState(null);
-        if (!payload.success && cs.eventState?.targetUser === cs.user.name) {
-            setUser(prev => ({ ...prev, remainingPoints: Math.max(0, prev.remainingPoints - 1) }));
-        }
+        handleEventOutcome(payload.success);
         break;
       case 'SYNC_REQUEST':
          if (cs.user.isAdmin) forceGlobalSync();
@@ -127,6 +127,34 @@ const App: React.FC = () => {
       case 'EVENT_STEP_UPDATE':
         setEventState(payload.eventState);
         break;
+    }
+  };
+
+  const handleEventOutcome = (success: boolean) => {
+    const cs = stateRef.current;
+    const type = cs.eventState?.type;
+    const target = cs.eventState?.targetUser;
+
+    setPhase(AppPhase.ROUND_REVEAL);
+    setEventState(null);
+
+    if (success) {
+        if (type === 'ROBBERY') {
+            // Todos ganan 6 créditos
+            setUser(prev => ({ ...prev, remainingPoints: prev.remainingPoints + 6 }));
+        } else if (target === cs.user.name) {
+            // El sujeto gana 2 créditos
+            setUser(prev => ({ ...prev, remainingPoints: prev.remainingPoints + 2 }));
+        }
+    } else {
+        // Fracaso
+        if (type === 'ROBBERY') {
+            // Todos pierden 1 crédito
+            setUser(prev => ({ ...prev, remainingPoints: Math.max(0, prev.remainingPoints - 1) }));
+        } else if (target === cs.user.name) {
+            // El sujeto pierde 1 crédito
+            setUser(prev => ({ ...prev, remainingPoints: Math.max(0, prev.remainingPoints - 1) }));
+        }
     }
   };
 
@@ -167,8 +195,8 @@ const App: React.FC = () => {
         } else if (amount > 0) {
             newAllocations.push({ userName, points: amount, isCurrentUser: userName === stateRef.current.user.name });
         }
-        gift.allocations = newAllocations;
         gift.totalPoints = newAllocations.reduce((acc, curr) => acc + curr.points, 0);
+        gift.allocations = newAllocations;
         updatedGifts[index] = gift;
         return updatedGifts;
     });
@@ -210,7 +238,11 @@ const App: React.FC = () => {
   const handleStartGame = async () => {
     setPhase(AppPhase.LOADING_GIFTS);
     const prizes = getStaticPrizes();
-    const newGifts: Gift[] = prizes.map((p, index) => ({
+    
+    // Aleatorizar el orden de los regalos para que cada partida sea diferente
+    const shuffledPrizes = [...prizes].sort(() => Math.random() - 0.5);
+
+    const newGifts: Gift[] = shuffledPrizes.map((p, index) => ({
       id: `gift-${index}`,
       hiddenName: `BATCH_${(index + 1).toString().padStart(2, '0')}`,
       revealedName: p.revealedName!,
@@ -256,9 +288,8 @@ const App: React.FC = () => {
   };
 
   const resolveEvent = (success: boolean) => {
-     setPhase(AppPhase.ROUND_REVEAL);
-     setEventState(null);
      broadcast({ type: 'EVENT_RESOLVED', success });
+     handleEventOutcome(success);
   };
 
   const handleNextRound = () => {
@@ -286,7 +317,12 @@ const App: React.FC = () => {
       const updated = [...prevGifts];
       const gift = { ...updated[idx] };
       if (!gift.isContentRevealed) gift.isContentRevealed = true;
-      else if (!gift.isWinnerRevealed) { gift.winners = selectWinners(gift, gift.packs); gift.isWinnerRevealed = true; }
+      else if (!gift.isWinnerRevealed) { 
+        // Penalización automática a ganadores previos integrada en selectWinners
+        gift.winners = selectWinners(gift, gift.packs, allWinners); 
+        gift.isWinnerRevealed = true; 
+        setAllWinners(prev => Array.from(new Set([...prev, ...(gift.winners || [])])));
+      }
       else return prevGifts;
       updated[idx] = gift;
       broadcast({ type: 'GIFT_UPDATE', gift });
@@ -484,6 +520,7 @@ const App: React.FC = () => {
                             userPointsAllocated={currentGift.allocations.find(a => a.userName === user.name)?.points || 0}
                             phase={phase}
                             canAllocate={user.remainingPoints > 0}
+                            remainingUserCredits={user.remainingPoints}
                             timeLeft={timeLeft}
                             isAdmin={user.isAdmin}
                             onAllocate={handlePlaceBet}

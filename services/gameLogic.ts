@@ -25,26 +25,40 @@ export const simulateRoundBets = (currentGift: Gift): string[] => {
   return botsToBet;
 };
 
-export const selectWinners = (gift: Gift, count: number): string[] => {
+/**
+ * Selecciona ganadores basándose en pesos.
+ * Si un usuario ya ha ganado (está en previousWinners), sus puntos valen mucho menos (probabilidad reducida).
+ */
+export const selectWinners = (gift: Gift, count: number, previousWinners: string[] = []): string[] => {
   if (gift.totalPoints === 0 || gift.allocations.length === 0) {
     return ["No Entries"];
   }
 
   const ticketPool: string[] = [];
   gift.allocations.forEach(allocation => {
-    for (let i = 0; i < allocation.points; i++) {
+    const hasWonBefore = previousWinners.includes(allocation.userName);
+    // Si ha ganado antes, le damos 1 ticket por punto.
+    // Si NO ha ganado antes, le damos 10 tickets por punto (10x más probabilidad).
+    const multiplier = hasWonBefore ? 1 : 10;
+    
+    for (let i = 0; i < (allocation.points * multiplier); i++) {
       ticketPool.push(allocation.userName);
     }
   });
 
   const winners = new Set<string>();
-  const safetyLimit = 100;
+  const safetyLimit = 500;
   let attempts = 0;
 
   // Intentar sacar ganadores únicos hasta llenar los packs
-  while (winners.size < count && winners.size < gift.allocations.length && attempts < safetyLimit) {
+  const maxPossibleWinners = Math.min(count, gift.allocations.length);
+  
+  while (winners.size < maxPossibleWinners && attempts < safetyLimit) {
     const winnerIndex = Math.floor(Math.random() * ticketPool.length);
-    winners.add(ticketPool[winnerIndex]);
+    const selected = ticketPool[winnerIndex];
+    if (selected) {
+        winners.add(selected);
+    }
     attempts++;
   }
 

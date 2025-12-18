@@ -20,8 +20,9 @@ const supabase = isSupabaseConfigured ? createClient(SUPABASE_URL, SUPABASE_ANON
 const ROUND_DURATION = 35; 
 const INITIAL_CREDITS = 12;
 
-// Definición de retos para distribución automática
 const AUTO_EVENTS: EventType[] = ['CUTLERY', 'ROBBERY', 'PRESSURE', 'SINGING'];
+// Lotes después de los cuales salta el reto: 3, 7, 11, 15
+const TRIGGER_INDICES = [2, 6, 10, 14]; 
 
 const App: React.FC = () => {
   const [phase, setPhase] = useState<AppPhase>(AppPhase.LOGIN);
@@ -36,8 +37,6 @@ const App: React.FC = () => {
   const [currentRoundIndex, setCurrentRoundIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState(ROUND_DURATION);
   const [eventState, setEventState] = useState<EventState | null>(null);
-  
-  // Seguimiento de retos completados para asegurar que no se repitan y se hagan todos
   const [completedEvents, setCompletedEvents] = useState<EventType[]>([]);
   
   const supabaseChannelRef = useRef<any>(null);
@@ -105,9 +104,8 @@ const App: React.FC = () => {
       case 'EVENT_RESOLVED':
         const target = cs.eventState?.targetUser;
         const type = cs.eventState?.type;
-        setPhase(AppPhase.ROUND_REVEAL);
+        setPhase(AppPhase.ROUND_REVEAL); // Volver al estado de revelación del anterior para que el admin pueda dar a "Siguiente"
         setEventState(null);
-
         if (!payload.success) {
             if (type === 'ROBBERY') {
                 if (cs.user.remainingPoints > 0) {
@@ -266,7 +264,6 @@ const App: React.FC = () => {
     setEventState(newState);
     setPhase(AppPhase.EVENT_NARRATIVE);
     broadcast({ type: 'PHASE_CHANGE', phase: AppPhase.EVENT_NARRATIVE, eventState: newState });
-    // Marcar reto como completado
     setCompletedEvents(prev => [...prev, type]);
   };
 
@@ -298,26 +295,16 @@ const App: React.FC = () => {
   const handleNextRound = () => {
       const nextIndex = currentRoundIndex + 1;
       
-      // Fin del juego
       if (nextIndex >= gifts.length) {
           setPhase(AppPhase.FINISHED);
           broadcast({ type: 'PHASE_CHANGE', phase: AppPhase.FINISHED });
           return;
       }
 
-      // Lógica de activación automática de retos
-      const totalPrizes = gifts.length;
-      const totalEvents = AUTO_EVENTS.length;
-      const interval = Math.floor(totalPrizes / (totalEvents + 1));
-      
       const pendingEvents = AUTO_EVENTS.filter(e => !completedEvents.includes(e));
       
-      if (nextIndex > 0 && nextIndex % interval === 0 && pendingEvents.length > 0) {
-          triggerEvent(pendingEvents[0]);
-          return;
-      }
-
-      if (nextIndex === totalPrizes - 1 && pendingEvents.length > 0) {
+      // Lógica de Retos Automáticos: Saltan justo cuando el admin pulsa "Siguiente" tras haber dado los ganadores
+      if (TRIGGER_INDICES.includes(currentRoundIndex) && pendingEvents.length > 0) {
           triggerEvent(pendingEvents[0]);
           return;
       }
@@ -465,7 +452,7 @@ const App: React.FC = () => {
                            {/* Bloque de Código de Sala + QR */}
                            <div className="lg:col-span-3 bg-[#18181b] border border-white/10 rounded-[40px] p-10 md:p-12 flex flex-col items-center justify-center text-center relative overflow-hidden shadow-2xl">
                                <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
-                               <span className="text-[12px] md:text-[14px] font-black uppercase tracking-[0.6em] text-white/30 mb-6 shrink-0">Acceso a Terminal</span>
+                               <span className="text-[12px] md:text-[14px] font-black uppercase tracking-[0.6em] text-white/30 mb-6 shrink-0">Bienvenido al LAB</span>
                                
                                <div className="flex flex-col md:flex-row items-center gap-10 md:gap-16 mb-8 w-full justify-center">
                                    <div className="relative group cursor-pointer shrink-0" onClick={() => {navigator.clipboard.writeText(roomCode)}}>
@@ -475,7 +462,6 @@ const App: React.FC = () => {
                                        </h2>
                                    </div>
 
-                                   {/* QR Code Section - Square enforcement */}
                                    <div className="relative flex flex-col items-center gap-4 group shrink-0">
                                        <div className="p-3 bg-white rounded-3xl shadow-2xl transition-transform group-hover:scale-105 duration-500 border-4 border-white/10 flex items-center justify-center aspect-square w-32 md:w-56">
                                            <img 
@@ -493,13 +479,13 @@ const App: React.FC = () => {
 
                                <p className="text-white/40 text-[11px] md:text-[13px] font-bold uppercase tracking-[0.3em] mb-10 leading-relaxed max-w-md shrink-0">
                                  {user.isAdmin 
-                                    ? `Proyecta este panel para que el equipo se una al protocolo.` 
+                                    ? `Sincronizando terminales biométricos para el inicio del protocolo de distribución.` 
                                     : `Sincronización establecida. Esperando inicio de sesión root.`}
                                </p>
 
                                {user.isAdmin && (
                                  <button onClick={handleStartGame} disabled={!isConnected} className="w-full max-w-sm bg-white text-black h-20 rounded-3xl flex items-center justify-between px-10 hover:shadow-[0_0_50px_rgba(255,255,255,0.4)] transition-all group disabled:opacity-20 border-b-4 border-black/20 shrink-0">
-                                     <span className="font-black uppercase tracking-[0.2em] text-[12px]">Inicializar Red</span>
+                                     <span className="font-black uppercase tracking-[0.2em] text-[12px]">Empezar Rifa</span>
                                      <Play size={20} fill="black" className="group-hover:scale-125 transition-transform" />
                                  </button>
                                )}

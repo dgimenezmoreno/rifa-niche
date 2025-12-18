@@ -4,17 +4,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Niche Xmas Giveaway | Exclusive Protocol</title>
+    <title>Niche Xmas Giveaway | Projector Optimized</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,200;400;500;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,400;700;900&display=swap" rel="stylesheet">
     <style>
       :root {
         --font-maison: 'DM Sans', system-ui, sans-serif;
-        --bg-main: #09090b;
-        --bg-card: #18181b;
-        --bg-section: #27272a;
-        --accent-white: #fafafa;
-        --border-subtle: rgba(255, 255, 255, 0.15);
+        --bg-main: #000000;
+        --bg-card: #000000;
+        --accent-white: #ffffff;
+        --border-high: #ffffff;
       }
 
       body {
@@ -24,34 +23,38 @@
         margin: 0;
         overflow-x: hidden;
         -webkit-font-smoothing: antialiased;
-        /* Pure CSS Background - Zero Image Files */
-        background-image: 
-            radial-gradient(circle at 50% -20%, #1e1e21 0%, transparent 70%),
-            linear-gradient(180deg, #09090b 0%, #000000 100%);
         min-height: 100vh;
       }
 
-      .glass-panel {
-        background: rgba(255, 255, 255, 0.03);
-        backdrop-filter: blur(20px);
-        border: 1px solid rgba(255, 255, 255, 0.08);
+      /* Eliminar transparencias y usar bordes sólidos para proyector */
+      .high-contrast-panel {
+        background: #000000;
+        border: 3px solid #ffffff;
       }
 
-      .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-      .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+      .custom-scrollbar::-webkit-scrollbar { width: 8px; }
+      .custom-scrollbar::-webkit-scrollbar-track { background: #000000; }
       .custom-scrollbar::-webkit-scrollbar-thumb { 
-        background: rgba(255,255,255,0.1); 
-        border-radius: 10px;
+        background: #ffffff; 
+        border-radius: 0px;
       }
-
-      @keyframes float {
-        0%, 100% { transform: translateY(0) scale(1); }
-        50% { transform: translateY(-10px) scale(1.02); }
-      }
-      .animate-float { animation: float 6s ease-in-out infinite; }
 
       .text-glow {
-        text-shadow: 0 0 20px rgba(255,255,255,0.2);
+        text-shadow: 0 0 10px rgba(255,255,255,0.8);
+      }
+
+      /* Forzar que el texto sea siempre legible en botones */
+      .btn-primary {
+        background-color: #ffffff;
+        color: #000000;
+        font-weight: 900;
+        border: 2px solid #ffffff;
+      }
+      
+      .btn-outline {
+        background-color: #000000;
+        color: #ffffff;
+        border: 3px solid #ffffff;
       }
     </style>
   <script type="importmap">

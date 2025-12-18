@@ -21,8 +21,8 @@ const ROUND_DURATION = 35;
 const INITIAL_CREDITS = 12;
 
 const AUTO_EVENTS: EventType[] = ['CUTLERY', 'ROBBERY', 'PRESSURE', 'SINGING'];
-// Lotes después de los cuales salta el reto: 3, 7, 11, 15
-const TRIGGER_INDICES = [2, 6, 10, 14]; 
+// Indices: 2 (Premio 3), 6 (Premio 7), 10 (Premio 11), 14 (Premio 15)
+const TRIGGER_INDICES = [2, 6, 10, 14];
 
 const App: React.FC = () => {
   const [phase, setPhase] = useState<AppPhase>(AppPhase.LOGIN);
@@ -58,6 +58,21 @@ const App: React.FC = () => {
     }
   };
 
+  const forceGlobalSync = (newParticipants?: string[]) => {
+    const cs = stateRef.current;
+    if (cs.user.isAdmin) {
+      broadcast({
+        type: 'SYNC_RESPONSE',
+        phase: cs.phase,
+        gifts: cs.gifts,
+        participants: newParticipants || cs.participants,
+        currentRoundIndex: cs.currentRoundIndex,
+        timeLeft: cs.timeLeft,
+        eventState: cs.eventState || undefined
+      });
+    }
+  };
+
   const handleIncomingMessage = (payload: BroadcastEvent) => {
     const cs = stateRef.current;
     switch (payload.type) {
@@ -67,24 +82,12 @@ const App: React.FC = () => {
         if (payload.currentRoundIndex !== undefined) setCurrentRoundIndex(payload.currentRoundIndex);
         if (payload.eventState) setEventState(payload.eventState);
         break;
-      case 'EVENT_STEP_UPDATE':
-        setEventState(payload.eventState);
-        break;
       case 'PLAYER_JOIN':
-        setParticipants(prev => {
-            if (prev.includes(payload.name)) return prev;
-            return [...prev, payload.name];
-        });
+        const updatedList = Array.from(new Set([...cs.participants, payload.name]));
+        setParticipants(updatedList);
         if (cs.user.isAdmin) {
-            broadcast({
-                type: 'SYNC_RESPONSE',
-                phase: cs.phase,
-                gifts: cs.gifts,
-                participants: Array.from(new Set([...cs.participants, payload.name, cs.user.name])),
-                currentRoundIndex: cs.currentRoundIndex,
-                timeLeft: cs.timeLeft,
-                eventState: cs.eventState || undefined
-            });
+            // Admin reacciona a la entrada de un jugador sincronizando a TODOS con la lista nueva
+            forceGlobalSync(updatedList);
         }
         break;
       case 'PLACE_BET':
@@ -102,34 +105,14 @@ const App: React.FC = () => {
         setTimeLeft(ROUND_DURATION);
         break;
       case 'EVENT_RESOLVED':
-        const target = cs.eventState?.targetUser;
-        const type = cs.eventState?.type;
-        setPhase(AppPhase.ROUND_REVEAL); // Volver al estado de revelación del anterior para que el admin pueda dar a "Siguiente"
+        setPhase(AppPhase.ROUND_REVEAL);
         setEventState(null);
-        if (!payload.success) {
-            if (type === 'ROBBERY') {
-                if (cs.user.remainingPoints > 0) {
-                    setUser(prev => ({ ...prev, remainingPoints: Math.max(0, prev.remainingPoints - 1) }));
-                }
-            } else if (target === cs.user.name) {
-                if (cs.user.remainingPoints > 0) {
-                    setUser(prev => ({ ...prev, remainingPoints: Math.max(0, prev.remainingPoints - 1) }));
-                }
-            }
+        if (!payload.success && cs.eventState?.targetUser === cs.user.name) {
+            setUser(prev => ({ ...prev, remainingPoints: Math.max(0, prev.remainingPoints - 1) }));
         }
         break;
       case 'SYNC_REQUEST':
-         if (cs.user.isAdmin) {
-             broadcast({
-              type: 'SYNC_RESPONSE',
-              phase: cs.phase,
-              gifts: cs.gifts,
-              participants: Array.from(new Set([...cs.participants, cs.user.name])),
-              currentRoundIndex: cs.currentRoundIndex,
-              timeLeft: cs.timeLeft,
-              eventState: cs.eventState || undefined
-            });
-         }
+         if (cs.user.isAdmin) forceGlobalSync();
          break;
       case 'SYNC_RESPONSE':
          if (!cs.user.isAdmin) {
@@ -141,23 +124,18 @@ const App: React.FC = () => {
            if (payload.eventState) setEventState(payload.eventState);
          }
          break;
+      case 'EVENT_STEP_UPDATE':
+        setEventState(payload.eventState);
+        break;
     }
   };
 
   const initConnection = (code: string): Promise<void> => {
     return new Promise((resolve) => {
-        if (!supabase) {
-            setIsConnected(false);
-            resolve();
-            return;
-        }
+        if (!supabase) { setIsConnected(false); resolve(); return; }
         const channelName = `raffle_room_${code}`;
-        if (supabaseChannelRef.current) {
-            supabase.removeChannel(supabaseChannelRef.current);
-        }
-        const sbChannel = supabase.channel(channelName, { 
-            config: { broadcast: { self: false } } 
-        });
+        if (supabaseChannelRef.current) supabase.removeChannel(supabaseChannelRef.current);
+        const sbChannel = supabase.channel(channelName, { config: { broadcast: { self: false } } });
         sbChannel.on('broadcast', { event: 'raffle_event' }, ({ payload }: { payload: BroadcastEvent }) => {
             handleIncomingMessage(payload);
         })
@@ -182,18 +160,13 @@ const App: React.FC = () => {
         const gift = { ...updatedGifts[index] };
         const newAllocations = [...gift.allocations];
         const existingIndex = newAllocations.findIndex(a => a.userName === userName);
-        
         if (existingIndex > -1) {
              const newPoints = newAllocations[existingIndex].points + amount;
-             if (newPoints <= 0) {
-                 newAllocations.splice(existingIndex, 1);
-             } else {
-                 newAllocations[existingIndex] = { ...newAllocations[existingIndex], points: newPoints };
-             }
+             if (newPoints <= 0) newAllocations.splice(existingIndex, 1);
+             else newAllocations[existingIndex] = { ...newAllocations[existingIndex], points: newPoints };
         } else if (amount > 0) {
             newAllocations.push({ userName, points: amount, isCurrentUser: userName === stateRef.current.user.name });
         }
-        
         gift.allocations = newAllocations;
         gift.totalPoints = newAllocations.reduce((acc, curr) => acc + curr.points, 0);
         updatedGifts[index] = gift;
@@ -219,7 +192,6 @@ const App: React.FC = () => {
   const handleJoin = async () => {
     if (!userInputName.trim() || roomCode.length !== 4) return;
     setUser({ ...user, name: userInputName, isAdmin: false });
-    setParticipants([userInputName]); 
     setPhase(AppPhase.WAITING);
     await initConnection(roomCode);
     broadcast({ type: 'PLAYER_JOIN', name: userInputName });
@@ -269,17 +241,14 @@ const App: React.FC = () => {
 
   const handleSpinRoulette = () => {
     if (!eventState || !user.isAdmin) return;
-    
     if (eventState.type === 'ROBBERY') {
         const newState: EventState = { ...eventState, step: 'ACTION' };
         setEventState(newState);
         broadcast({ type: 'EVENT_STEP_UPDATE', eventState: newState });
         return;
     }
-
     const pool = participants.filter(p => p !== 'Root Admin');
     if (pool.length === 0) return;
-    
     const target = pool[Math.floor(Math.random() * pool.length)];
     const newState: EventState = { ...eventState, step: 'ACTION', targetUser: target };
     setEventState(newState);
@@ -294,22 +263,16 @@ const App: React.FC = () => {
 
   const handleNextRound = () => {
       const nextIndex = currentRoundIndex + 1;
-      
       if (nextIndex >= gifts.length) {
           setPhase(AppPhase.FINISHED);
           broadcast({ type: 'PHASE_CHANGE', phase: AppPhase.FINISHED });
           return;
       }
-
       const pendingEvents = AUTO_EVENTS.filter(e => !completedEvents.includes(e));
-      
-      // Lógica de Retos Automáticos: Saltan justo cuando el admin pulsa "Siguiente" tras haber dado los ganadores
       if (TRIGGER_INDICES.includes(currentRoundIndex) && pendingEvents.length > 0) {
           triggerEvent(pendingEvents[0]);
           return;
       }
-
-      // Avance normal de ronda
       setCurrentRoundIndex(nextIndex);
       setPhase(AppPhase.ROUND_WAITING);
       broadcast({ type: 'ROUND_CHANGE', roundIndex: nextIndex });
@@ -336,7 +299,6 @@ const App: React.FC = () => {
       if (amount > 0 && user.remainingPoints <= 0) return;
       const currentPoints = currentGift?.allocations.find(a => a.userName === user.name)?.points || 0;
       if (amount < 0 && currentPoints <= 0) return;
-
       setUser(prev => ({ ...prev, remainingPoints: prev.remainingPoints - amount }));
       handleIncomingBet(giftId, user.name, amount);
       broadcast({ type: 'PLACE_BET', giftId, userName: user.name, amount });
@@ -347,14 +309,12 @@ const App: React.FC = () => {
         <div className="min-h-screen flex items-center justify-center p-4 bg-[#0a0a0b] relative overflow-hidden">
           <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-white/5 blur-[150px] rounded-full pointer-events-none"></div>
           <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] bg-white/5 blur-[150px] rounded-full pointer-events-none"></div>
-
           <div className="w-full max-w-xl z-10">
              <div className="bg-[#18181b] border border-white/20 p-8 md:p-12 rounded-[40px] shadow-[0_0_100px_rgba(0,0,0,0.8)] relative overflow-hidden">
                  <div className="text-center mb-10">
                      <span className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 block mb-4">Niche Beauty Lab Protocol</span>
                      <h2 className="text-4xl md:text-6xl font-black tracking-tighter text-white uppercase leading-none">Niche<br/><span className="text-white/20">Xmas Giveaway</span></h2>
                  </div>
-
                  {!loginMode ? (
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in zoom-in duration-500">
                       <button onClick={() => setLoginMode('USER')} className="group bg-[#27272a] hover:bg-white border border-white/10 p-8 rounded-[30px] transition-all duration-500 flex flex-col items-center gap-4">
@@ -364,7 +324,6 @@ const App: React.FC = () => {
                             <span className="text-[8px] font-bold text-white/30 group-hover:text-black/40 uppercase tracking-widest">Soy Participante</span>
                          </div>
                       </button>
-
                       <button onClick={() => setLoginMode('ADMIN')} className="group bg-[#09090b] hover:bg-white border border-white/10 p-8 rounded-[30px] transition-all duration-500 flex flex-col items-center gap-4">
                          <ShieldCheck size={28} className="text-white group-hover:text-black" />
                          <div className="text-center">
@@ -419,19 +378,16 @@ const App: React.FC = () => {
           onResolve={resolveEvent}
         />
       )}
-
       <header className="bg-[#18181b]/95 backdrop-blur-3xl border-b border-white/10 px-4 py-4 flex flex-row items-center justify-between z-40 shrink-0">
           <div className="flex items-center gap-2">
               <div className="w-7 h-7 bg-white flex items-center justify-center rounded-lg shrink-0"><FlaskConical size={14} className="text-black" /></div>
-              <span className="font-bold tracking-tighter text-sm md:text-xl uppercase truncate">Niche Beauty Lab</span>
+              <span className="font-bold tracking-tighter text-sm md:text-xl uppercase truncate text-glow">Niche Beauty Lab</span>
           </div>
-          
           <div className="flex items-center gap-2">
               <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl">
                   <span className="text-xs font-mono font-black text-white">{roomCode}</span>
                   {isConnected ? <Wifi size={12} className="text-emerald-500" /> : <WifiOff size={12} className="text-red-500 animate-pulse" />}
               </div>
-
               {!user.isAdmin && (
                 <div className="flex items-center gap-2 bg-[#27272a] px-3 py-2 rounded-xl border border-white/5">
                     <div className="flex gap-1">
@@ -443,17 +399,14 @@ const App: React.FC = () => {
               )}
           </div>
       </header>
-
       <div className="flex flex-1 overflow-hidden">
-          <main className="flex-1 overflow-y-auto p-4 flex flex-col items-center">
+          <main className="flex-1 overflow-hidden flex flex-col items-center">
               {phase === AppPhase.WAITING ? (
-                  <div className="w-full max-w-6xl animate-in fade-in duration-700 pt-6">
+                  <div className="w-full max-w-6xl animate-in fade-in duration-700 pt-6 overflow-y-auto custom-scrollbar px-4 pb-12">
                       <div className="grid lg:grid-cols-5 gap-8">
-                           {/* Bloque de Código de Sala + QR */}
                            <div className="lg:col-span-3 bg-[#18181b] border border-white/10 rounded-[40px] p-10 md:p-12 flex flex-col items-center justify-center text-center relative overflow-hidden shadow-2xl">
                                <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
                                <span className="text-[12px] md:text-[14px] font-black uppercase tracking-[0.6em] text-white/30 mb-6 shrink-0">Bienvenido al LAB</span>
-                               
                                <div className="flex flex-col md:flex-row items-center gap-10 md:gap-16 mb-8 w-full justify-center">
                                    <div className="relative group cursor-pointer shrink-0" onClick={() => {navigator.clipboard.writeText(roomCode)}}>
                                        <div className="absolute -inset-10 bg-white/5 blur-[80px] rounded-full opacity-50 group-hover:opacity-100 transition-opacity"></div>
@@ -461,11 +414,10 @@ const App: React.FC = () => {
                                            {roomCode}
                                        </h2>
                                    </div>
-
                                    <div className="relative flex flex-col items-center gap-4 group shrink-0">
                                        <div className="p-3 bg-white rounded-3xl shadow-2xl transition-transform group-hover:scale-105 duration-500 border-4 border-white/10 flex items-center justify-center aspect-square w-32 md:w-56">
                                            <img 
-                                               src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=http://rifa-niche.vercel.app/" 
+                                               src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(window.location.href)}`} 
                                                alt="Scan to Join"
                                                className="w-full h-full rounded-xl object-contain"
                                            />
@@ -476,13 +428,11 @@ const App: React.FC = () => {
                                        </div>
                                    </div>
                                </div>
-
                                <p className="text-white/40 text-[11px] md:text-[13px] font-bold uppercase tracking-[0.3em] mb-10 leading-relaxed max-w-md shrink-0">
                                  {user.isAdmin 
-                                    ? `Sincronizando terminales biométricos para el inicio del protocolo de distribución.` 
-                                    : `Sincronización establecida. Esperando inicio de sesión root.`}
+                                    ? `Sincronizando terminales biométricos para el inicio del protocolo de distribución de lotes.` 
+                                    : `Sincronización establecida. Esperando inicio de sesión root para el despliegue del LAB.`}
                                </p>
-
                                {user.isAdmin && (
                                  <button onClick={handleStartGame} disabled={!isConnected} className="w-full max-w-sm bg-white text-black h-20 rounded-3xl flex items-center justify-between px-10 hover:shadow-[0_0_50px_rgba(255,255,255,0.4)] transition-all group disabled:opacity-20 border-b-4 border-black/20 shrink-0">
                                      <span className="font-black uppercase tracking-[0.2em] text-[12px]">Empezar Rifa</span>
@@ -490,7 +440,6 @@ const App: React.FC = () => {
                                  </button>
                                )}
                            </div>
-
                            <div className="lg:col-span-2 flex flex-col gap-6">
                                <div className="bg-[#27272a] border border-white/10 rounded-[40px] p-10 flex flex-col h-full shadow-xl">
                                    <div className="flex justify-between items-center mb-10 shrink-0">
@@ -528,7 +477,7 @@ const App: React.FC = () => {
                       <span className="text-[11px] font-black uppercase tracking-[0.8em] text-white/20">Compilando Activos de Campaña</span>
                   </div>
               ) : (
-                <div className="w-full max-w-7xl animate-in fade-in zoom-in duration-500">
+                <div className="w-full h-full max-w-7xl animate-in fade-in zoom-in duration-500 flex items-center justify-center overflow-hidden">
                     {currentGift ? (
                         <GiftCard 
                             gift={currentGift}
@@ -551,7 +500,6 @@ const App: React.FC = () => {
               )}
           </main>
       </div>
-
       {user.isAdmin && currentGift && (
           <div className="bg-[#18181b] border-t border-white/20 p-4 z-50 shadow-2xl shrink-0 overflow-x-auto">
               <div className="max-w-7xl mx-auto flex flex-row items-center justify-between gap-4 min-w-[700px]">
@@ -567,7 +515,6 @@ const App: React.FC = () => {
                           <span className="text-[8px] font-black uppercase tracking-widest text-white/30">Retos Automáticos Programados</span>
                       </div>
                   </div>
-
                   <div className="flex gap-2">
                       {phase === AppPhase.ROUND_WAITING && (
                         <button onClick={handleStartRound} className="bg-white text-black px-6 h-10 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:shadow-xl transition-all">

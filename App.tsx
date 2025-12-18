@@ -1,14 +1,13 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { AppPhase, CurrentUser, Gift, BroadcastEvent, EventState } from './types';
 import { GiftCard } from './components/GiftCard';
 import { EventOverlay } from './components/EventOverlay';
 import { getStaticPrizes } from './services/geminiService';
-import { simulateRoundBets, selectWinners, BOT_NAMES } from './services/gameLogic';
+import { selectWinners } from './services/gameLogic';
 import { 
   Play, ShieldCheck, Timer, ArrowRight, FlaskConical, 
-  Dna, Beaker, Activity, Loader2, Users, Wifi, WifiOff
+  Loader2, Users, Wifi, WifiOff
 } from 'lucide-react';
 
 // REQUERIDO: Pega aquí tus llaves de Supabase si no las tienes configuradas como variables de entorno.
@@ -191,13 +190,7 @@ const App: React.FC = () => {
                 if (newVal <= 0) { clearInterval(interval); handleRoundLock(); return 0; }
                 return newVal;
             });
-            if (gifts[currentRoundIndex]) {
-                const botsToBet = simulateRoundBets(gifts[currentRoundIndex]);
-                botsToBet.forEach(botName => {
-                    handleIncomingBet(gifts[currentRoundIndex].id, botName);
-                    broadcast({ type: 'PLACE_BET', giftId: gifts[currentRoundIndex].id, userName: botName });
-                });
-            }
+            // SE HAN ELIMINADO LOS BOTS AQUÍ
         }, 1000);
     }
     return () => clearInterval(interval);
@@ -254,7 +247,9 @@ const App: React.FC = () => {
   const handleSpinRoulette = () => {
     if (!eventState || !user.isAdmin) return;
     const activeAllocations = currentGift?.allocations.map(a => a.userName) || [];
-    const pool = participants.length > 0 ? participants : activeAllocations.length > 0 ? activeAllocations : BOT_NAMES;
+    const pool = participants.length > 0 ? participants : (activeAllocations.length > 0 ? activeAllocations : []);
+    if (pool.length === 0) return; // No hay nadie a quien elegir
+    
     const target = pool[Math.floor(Math.random() * pool.length)];
     const newState: EventState = { ...eventState, step: 'ACTION', targetUser: eventState.type === 'CUTLERY' ? target : undefined };
     setEventState(newState);

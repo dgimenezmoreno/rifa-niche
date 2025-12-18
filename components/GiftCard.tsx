@@ -34,10 +34,11 @@ export const GiftCard: React.FC<GiftCardProps> = ({
     <div className="w-full max-w-6xl mx-auto">
       <div 
         onClick={() => canAdminReveal && onAdminReveal && onAdminReveal(gift.id)}
-        className={`relative flex flex-col lg:flex-row bg-[#18181b] border border-white/20 transition-all duration-500 min-h-[450px] md:min-h-[680px] rounded-[32px] md:rounded-[40px] overflow-hidden shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)] ${
+        className={`relative flex flex-col lg:flex-row bg-[#18181b] border border-white/20 transition-all duration-500 h-auto lg:h-[720px] rounded-[32px] md:rounded-[40px] overflow-hidden shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)] ${
           canAdminReveal ? 'cursor-pointer hover:border-white/40 group/card ring-1 ring-white/10' : ''
         }`}
       >
+        {/* LADO IZQUIERDO: IMAGEN/ESTADO DEL REGALO */}
         <div className="w-full lg:w-7/12 relative overflow-hidden flex items-center justify-center p-6 md:p-12 bg-gradient-to-br from-[#27272a] to-[#18181b] border-b lg:border-b-0 lg:border-r border-white/10">
              <div className="absolute inset-0 opacity-5 pointer-events-none" style={{backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '30px 30px'}}></div>
              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.05)_0%,transparent_70%)]"></div>
@@ -51,7 +52,7 @@ export const GiftCard: React.FC<GiftCardProps> = ({
                         </div>
                         <h3 className="text-3xl md:text-6xl font-black text-white mb-3 md:mb-6 tracking-tighter uppercase leading-tight px-4">{gift.revealedName}</h3>
                         <div className="px-5 py-2 md:px-10 md:py-4 bg-white text-black rounded-xl md:rounded-3xl font-black uppercase tracking-[0.1em] md:tracking-[0.2em] text-[7px] md:text-[10px] shadow-2xl flex items-center gap-2 md:gap-3">
-                            <FlaskConical size={12} fill="black" className="md:size-16" /> ACTIVO ESTABILIZADO: {gift.packs} UNIDADES
+                            <FlaskConical size={14} fill="black" /> ACTIVO ESTABILIZADO: {gift.packs} UNIDADES
                         </div>
                     </div>
                 ) : (
@@ -62,11 +63,11 @@ export const GiftCard: React.FC<GiftCardProps> = ({
                                 {isBettingPhase ? (
                                     <div className="flex flex-col items-center text-center px-4 md:px-6">
                                         <div className="absolute inset-0 bg-white/[0.03] animate-[pulse_1.5s_infinite]"></div>
-                                        <Beaker size={28} className="text-white/20 mb-3 md:mb-4 animate-bounce md:size-48" />
+                                        <Beaker size={48} className="text-white/20 mb-3 md:mb-4 animate-bounce" />
                                         <span className="text-[8px] md:text-[11px] font-bold text-white/40 uppercase tracking-[0.2em] md:tracking-[0.3em] relative z-10">Sintetizando...</span>
                                     </div>
                                 ) : (
-                                    <Lock size={36} className="text-white/5 md:size-64" />
+                                    <Lock size={64} className="text-white/5" />
                                 )}
                              </div>
                         </div>
@@ -88,8 +89,10 @@ export const GiftCard: React.FC<GiftCardProps> = ({
              </div>
         </div>
 
-        <div className="w-full lg:w-5/12 flex flex-col bg-[#09090b]">
-            <div className="p-5 md:p-10 bg-[#18181b] border-b border-white/10 flex justify-between items-center shadow-lg shrink-0">
+        {/* LADO DERECHO: PARTICIPANTES Y VOTO (SIN SCROLL EN EL CONTENEDOR PRINCIPAL) */}
+        <div className="w-full lg:w-5/12 flex flex-col bg-[#09090b] overflow-hidden">
+            {/* Header del Nodo */}
+            <div className="p-5 md:p-8 bg-[#18181b] border-b border-white/10 flex justify-between items-center shadow-lg shrink-0">
                 <div>
                      <span className="block text-[7px] md:text-[9px] font-bold uppercase tracking-[0.2em] md:tracking-[0.3em] text-white/30 mb-1 tracking-widest">Protocolo de Red</span>
                      <div className="flex items-center gap-2 md:gap-3">
@@ -101,17 +104,17 @@ export const GiftCard: React.FC<GiftCardProps> = ({
                 </div>
                 {isBettingPhase && (
                     <div className="bg-[#09090b] px-4 py-1.5 md:px-7 md:py-3 rounded-lg md:rounded-2xl border border-white/20 shadow-inner">
-                         <div className="text-xl md:text-4xl font-mono font-black tracking-tighter text-white tabular-nums">{timeLeft.toString().padStart(2, '0')}</div>
+                         <div className="text-xl md:text-3xl font-mono font-black tracking-tighter text-white tabular-nums">{timeLeft.toString().padStart(2, '0')}</div>
                     </div>
                 )}
             </div>
 
-            <div className="flex-1 flex flex-col overflow-hidden min-h-[250px] md:min-h-[300px]">
+            {/* LISTA CON SCROLL INDEPENDIENTE */}
+            <div className="flex-1 flex flex-col overflow-hidden min-h-[300px]">
                 {gift.isWinnerRevealed && gift.winners ? (
                     <div className="flex-1 flex flex-col p-6 md:p-10 animate-in slide-in-from-bottom duration-700 bg-gradient-to-t from-[#18181b]/20 to-transparent overflow-hidden">
                         <div className="flex items-center gap-2 md:gap-3 mb-5 md:mb-10 shrink-0">
-                            {/* FIX: Removed invalid 'md:size' prop and moved responsive sizing to className using Tailwind classes */}
-                            <Trophy className="text-amber-400 md:size-[18px]" size={16} />
+                            <Trophy className="text-amber-400" size={18} />
                             <span className="text-[8px] md:text-[10px] font-black uppercase tracking-[0.3em] md:tracking-[0.4em] text-white/50 italic">Sujetos Seleccionados:</span>
                         </div>
                         <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-2 md:space-y-4">
@@ -129,10 +132,10 @@ export const GiftCard: React.FC<GiftCardProps> = ({
                     <div className="flex-1 flex flex-col overflow-hidden">
                         <div className="px-6 py-3 md:px-10 md:py-6 flex justify-between items-center border-b border-white/5 bg-white/[0.02] shrink-0">
                             <span className="text-[8px] md:text-[11px] font-black uppercase tracking-[0.3em] md:tracking-[0.4em] text-white/40 flex items-center gap-2">
-                                {/* FIX: Removed invalid 'md:size' prop and moved responsive sizing to className using Tailwind classes */}
-                                <Activity size={12} className="md:size-[14px]" /> Puja de Formulación ({gift.totalPoints})
+                                <Activity size={14} /> Puja de Formulación ({gift.totalPoints})
                             </span>
                         </div>
+                        {/* ESTA ES LA ÚNICA PARTE QUE HACE SCROLL */}
                         <div className="flex-1 overflow-y-auto px-5 py-4 md:px-8 md:py-6 space-y-2 md:space-y-3 custom-scrollbar">
                             {gift.allocations.length > 0 ? (
                                 gift.allocations.sort((a,b) => b.points - a.points).map((alloc, idx) => (
@@ -146,8 +149,7 @@ export const GiftCard: React.FC<GiftCardProps> = ({
                                 ))
                             ) : (
                                 <div className="h-full flex flex-col items-center justify-center opacity-10 gap-3 md:gap-6">
-                                    {/* FIX: Removed invalid 'md:size' prop and moved responsive sizing to className using Tailwind classes */}
-                                    <FlaskConical size={32} className="md:size-16" strokeWidth={1} />
+                                    <FlaskConical size={64} strokeWidth={1} />
                                     <p className="text-[8px] md:text-[11px] font-bold uppercase tracking-[0.3em] md:tracking-[0.5em] text-center max-w-[120px] md:max-w-[150px]">Terminal a la espera de instrucciones</p>
                                 </div>
                             )}
@@ -156,25 +158,39 @@ export const GiftCard: React.FC<GiftCardProps> = ({
                 )}
             </div>
 
-            <div className="p-5 md:p-10 bg-[#18181b] border-t border-white/20 shrink-0">
+            {/* PIE ESTÁTICO: SECCIÓN DE VOTO */}
+            <div className="p-6 md:p-8 bg-[#18181b] border-t border-white/20 shrink-0">
                 {!isAdmin && !gift.isWinnerRevealed ? (
-                    <button
-                        onClick={() => onAllocate(gift.id)}
-                        disabled={!canAllocate || !isBettingPhase}
-                        className={`w-full h-14 md:h-20 rounded-xl md:rounded-3xl flex items-center justify-between px-6 md:px-10 transition-all group overflow-hidden relative border-2 ${
-                            canAllocate && isBettingPhase 
-                            ? 'bg-white text-black border-white hover:shadow-[0_0_50px_rgba(255,255,255,0.3)] hover:-translate-y-1' 
-                            : 'bg-[#27272a] text-white/10 border-white/5 grayscale cursor-not-allowed opacity-50'
-                        }`}
-                    >
-                        <div className="flex flex-col items-start relative z-10 text-left">
-                          <span className="font-black uppercase tracking-[0.1em] md:tracking-[0.25em] text-[9px] md:text-[11px]">Inyectar Crédito Lab</span>
-                          <span className="text-[7px] md:text-[9px] font-bold opacity-40 uppercase tracking-widest mt-0.5 md:mt-1">Coste: 1 activo</span>
+                    <div className="space-y-4">
+                        <div className="flex justify-between items-end px-2">
+                             <div className="flex flex-col">
+                                <span className="text-[8px] md:text-[10px] font-black uppercase tracking-[0.3em] text-white/30">Tu stake actual</span>
+                                <span className="text-xl md:text-3xl font-black text-white">{userPointsAllocated} <span className="text-[10px] md:text-sm text-white/20">ACTIVOS</span></span>
+                             </div>
+                             <div className="text-right flex flex-col">
+                                <span className="text-[8px] md:text-[10px] font-black uppercase tracking-[0.3em] text-white/30">Disponibles</span>
+                                <span className="text-xl md:text-2xl font-mono font-bold text-white/60">{canAllocate ? 'READY' : 'DEPLETED'}</span>
+                             </div>
                         </div>
-                        <Zap size={16} className={`relative z-10 md:size-22 transition-transform ${isBettingPhase ? 'group-hover:scale-125 group-hover:rotate-12 fill-current' : ''}`} />
-                    </button>
+
+                        <button
+                            onClick={(e) => { e.stopPropagation(); onAllocate(gift.id); }}
+                            disabled={!canAllocate || !isBettingPhase}
+                            className={`w-full h-16 md:h-24 rounded-2xl md:rounded-3xl flex items-center justify-between px-6 md:px-10 transition-all group overflow-hidden relative border-2 ${
+                                canAllocate && isBettingPhase 
+                                ? 'bg-white text-black border-white hover:shadow-[0_0_50px_rgba(255,255,255,0.3)] active:scale-95' 
+                                : 'bg-[#27272a] text-white/10 border-white/5 grayscale cursor-not-allowed opacity-50'
+                            }`}
+                        >
+                            <div className="flex flex-col items-start relative z-10 text-left">
+                              <span className="font-black uppercase tracking-[0.1em] md:tracking-[0.25em] text-[10px] md:text-[12px]">Inyectar Crédito Lab</span>
+                              <span className="text-[7px] md:text-[9px] font-bold opacity-40 uppercase tracking-widest mt-0.5 md:mt-1">Protocolo: Inmediato</span>
+                            </div>
+                            <Zap size={22} className={`relative z-10 transition-transform ${isBettingPhase ? 'group-hover:scale-125 group-hover:rotate-12 fill-current' : ''}`} />
+                        </button>
+                    </div>
                 ) : (
-                    <div className="flex flex-col items-center justify-center py-2 md:py-4 opacity-20">
+                    <div className="flex flex-col items-center justify-center py-4 md:py-8 opacity-20">
                          <div className="flex items-center gap-2 md:gap-3 mb-1">
                             <div className="h-[1px] w-6 md:w-10 bg-white"></div>
                             <span className="text-[8px] md:text-[10px] font-black uppercase tracking-[0.3em] md:tracking-[0.5em]">Lote Estabilizado</span>

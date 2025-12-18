@@ -15,7 +15,7 @@ export type EventType = 'CUTLERY' | 'ROBBERY';
 
 export interface EventState {
   type: EventType;
-  step: 'ALERT' | 'STORY' | 'ACTION' | 'RESULT';
+  step: 'STORY' | 'ACTION'; // Aligned with implementation
   targetUser?: string;
   isSpinning?: boolean;
 }

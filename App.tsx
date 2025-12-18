@@ -8,7 +8,8 @@ import { getStaticPrizes } from './services/geminiService';
 import { selectWinners } from './services/gameLogic';
 import { 
   Play, ShieldCheck, Timer, ArrowRight, FlaskConical, 
-  Loader2, Users, Wifi, WifiOff, Copy, AlertCircle, QrCode
+  Loader2, Users, Wifi, WifiOff, Copy, AlertCircle, QrCode,
+  Trophy, CheckCircle2, RefreshCw, FileText
 } from 'lucide-react';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ecvhanpeesnclvzkvikg.supabase.co';
@@ -20,9 +21,7 @@ const supabase = isSupabaseConfigured ? createClient(SUPABASE_URL, SUPABASE_ANON
 const ROUND_DURATION = 35; 
 const INITIAL_CREDITS = 12;
 
-// Retos en orden: El segundo es ROBBERY (Brecha de Seguridad)
 const AUTO_EVENTS: EventType[] = ['CUTLERY', 'ROBBERY', 'PRESSURE', 'SINGING'];
-// Con 16 regalos, repartimos los retos cada 4 rondas aproximadamente
 const TRIGGER_INDICES = [3, 7, 11, 14]; 
 
 const App: React.FC = () => {
@@ -140,19 +139,14 @@ const App: React.FC = () => {
 
     if (success) {
         if (type === 'ROBBERY') {
-            // Todos ganan 6 créditos
             setUser(prev => ({ ...prev, remainingPoints: prev.remainingPoints + 6 }));
         } else if (target === cs.user.name) {
-            // El sujeto gana 2 créditos
             setUser(prev => ({ ...prev, remainingPoints: prev.remainingPoints + 2 }));
         }
     } else {
-        // Fracaso
         if (type === 'ROBBERY') {
-            // Todos pierden 1 crédito
             setUser(prev => ({ ...prev, remainingPoints: Math.max(0, prev.remainingPoints - 1) }));
         } else if (target === cs.user.name) {
-            // El sujeto pierde 1 crédito
             setUser(prev => ({ ...prev, remainingPoints: Math.max(0, prev.remainingPoints - 1) }));
         }
     }
@@ -238,10 +232,7 @@ const App: React.FC = () => {
   const handleStartGame = async () => {
     setPhase(AppPhase.LOADING_GIFTS);
     const prizes = getStaticPrizes();
-    
-    // Aleatorizar el orden de los regalos para que cada partida sea diferente
     const shuffledPrizes = [...prizes].sort(() => Math.random() - 0.5);
-
     const newGifts: Gift[] = shuffledPrizes.map((p, index) => ({
       id: `gift-${index}`,
       hiddenName: `BATCH_${(index + 1).toString().padStart(2, '0')}`,
@@ -318,7 +309,6 @@ const App: React.FC = () => {
       const gift = { ...updated[idx] };
       if (!gift.isContentRevealed) gift.isContentRevealed = true;
       else if (!gift.isWinnerRevealed) { 
-        // Penalización automática a ganadores previos integrada en selectWinners
         gift.winners = selectWinners(gift, gift.packs, allWinners); 
         gift.isWinnerRevealed = true; 
         setAllWinners(prev => Array.from(new Set([...prev, ...(gift.winners || [])])));
@@ -401,6 +391,58 @@ const App: React.FC = () => {
           </div>
         </div>
       );
+  }
+
+  if (phase === AppPhase.FINISHED) {
+    return (
+      <div className="min-h-screen bg-[#09090b] p-6 md:p-12 overflow-y-auto custom-scrollbar">
+          <div className="max-w-4xl mx-auto space-y-12 pb-20">
+              <div className="text-center space-y-4">
+                  <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-500/10 border border-emerald-500/20 rounded-full text-emerald-500 text-[10px] font-black uppercase tracking-widest">
+                      <CheckCircle2 size={14} /> Protocolo Finalizado con Éxito
+                  </div>
+                  <h1 className="text-5xl md:text-7xl font-black text-white uppercase tracking-tighter leading-none">Informe Final<br/><span className="text-white/20">del LAB</span></h1>
+                  <p className="text-white/40 text-[11px] font-bold uppercase tracking-[0.4em]">Resumen de Distribución de Activos</p>
+              </div>
+
+              <div className="grid gap-6">
+                  {gifts.map((gift, idx) => (
+                      <div key={idx} className="bg-[#18181b] border border-white/10 p-8 rounded-[40px] flex flex-col md:flex-row md:items-center gap-8 shadow-2xl relative overflow-hidden group hover:border-white/20 transition-all">
+                          <div className="text-6xl group-hover:scale-110 transition-transform duration-500">{gift.emoji}</div>
+                          <div className="flex-1 space-y-2">
+                              <span className="text-[9px] font-black uppercase tracking-[0.4em] text-white/20 block">Lote {idx + 1}</span>
+                              <h3 className="text-2xl font-black text-white uppercase tracking-tight">{gift.revealedName}</h3>
+                              <div className="flex flex-wrap gap-2 pt-2">
+                                  {gift.winners && gift.winners.length > 0 ? (
+                                      gift.winners.map((winner, wIdx) => (
+                                          <div key={wIdx} className="bg-white text-black px-4 py-1.5 rounded-xl text-[10px] font-black uppercase flex items-center gap-2 shadow-lg">
+                                              <Trophy size={12} /> {winner}
+                                          </div>
+                                      ))
+                                  ) : (
+                                      <span className="text-[10px] font-bold text-white/10 uppercase tracking-widest">Sin Ganadores Registrados</span>
+                                  )}
+                              </div>
+                          </div>
+                          <div className="md:text-right">
+                               <span className="block text-[8px] font-black text-white/20 uppercase tracking-widest mb-1">Unidades</span>
+                               <span className="text-4xl font-mono font-black text-white/80">{gift.packs}</span>
+                          </div>
+                      </div>
+                  ))}
+              </div>
+
+              <div className="flex flex-col md:flex-row gap-4 justify-center pt-8">
+                  <button onClick={() => window.location.reload()} className="bg-white text-black h-16 px-10 rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-3 hover:scale-105 transition-all">
+                      <RefreshCw size={18} /> Nueva Partida
+                  </button>
+                  <button onClick={() => window.print()} className="bg-white/5 border border-white/10 text-white h-16 px-10 rounded-2xl font-black uppercase tracking-widest text-[11px] flex items-center justify-center gap-3 hover:bg-white/10 transition-all">
+                      <FileText size={18} /> Imprimir Acta
+                  </button>
+              </div>
+          </div>
+      </div>
+    );
   }
 
   return (

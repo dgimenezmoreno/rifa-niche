@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { EventState } from '../types';
 import { 
@@ -48,7 +47,8 @@ export const EventOverlay: React.FC<EventOverlayProps> = ({
   const renderStory = () => (
     <div className="animate-in fade-in slide-in-from-bottom-12 duration-500 max-w-3xl w-full text-center px-4 md:px-6">
       <div className={`mx-auto w-20 h-20 md:w-28 md:h-28 rounded-[30px] md:rounded-[40px] flex items-center justify-center mb-8 md:mb-12 shadow-[0_0_60px_rgba(255,255,255,0.1)] border-2 ${isCutlery ? 'bg-orange-500 border-orange-400 text-white' : 'bg-red-600 border-red-500 text-white'}`}>
-        {isCutlery ? <Utensils size={40} md:size={56} /> : <ShieldAlert size={40} md:size={56} />}
+        {/* FIX: Removed invalid 'md:size' prop and moved responsive sizing to className using Tailwind classes */}
+        {isCutlery ? <Utensils size={40} className="md:size-14" /> : <ShieldAlert size={40} className="md:size-14" />}
       </div>
       <h3 className="text-4xl md:text-6xl font-black uppercase tracking-tighter text-white mb-6 md:mb-10 leading-none">
         {isCutlery ? 'Protocolo Cocina' : 'Brecha de Seguridad'}
@@ -109,7 +109,8 @@ export const EventOverlay: React.FC<EventOverlayProps> = ({
         <div className="text-center w-full max-w-2xl px-2">
           <div className="bg-[#18181b] border-4 border-red-600/50 p-10 md:p-14 rounded-[40px] md:rounded-[60px] mb-8 md:mb-12 shadow-2xl backdrop-blur-3xl relative">
             <div className="absolute -top-8 md:-top-10 left-1/2 -translate-x-1/2 w-16 h-16 md:w-20 md:h-20 bg-red-600 rounded-2xl md:rounded-3xl flex items-center justify-center border-4 border-red-500 shadow-xl">
-               <Activity size={32} md:size={40} className="text-white" />
+               {/* FIX: Removed invalid 'md:size' prop and moved responsive sizing to className using Tailwind classes */}
+               <Activity size={32} className="text-white md:size-10" />
             </div>
             <h4 className="text-red-500 font-black uppercase tracking-[0.4em] md:tracking-[0.6em] text-[10px] md:text-sm mb-6 md:mb-10 mt-6 md:mt-8">Protocolo de Emergencia</h4>
             <div className="space-y-6 md:space-y-8 mb-4">

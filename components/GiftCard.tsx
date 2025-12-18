@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Gift, AppPhase } from '../types';
 import { Lock, Trophy, Zap, FlaskConical, Beaker, Activity } from 'lucide-react';
@@ -111,7 +110,8 @@ export const GiftCard: React.FC<GiftCardProps> = ({
                 {gift.isWinnerRevealed && gift.winners ? (
                     <div className="flex-1 flex flex-col p-6 md:p-10 animate-in slide-in-from-bottom duration-700 bg-gradient-to-t from-[#18181b]/20 to-transparent overflow-hidden">
                         <div className="flex items-center gap-2 md:gap-3 mb-5 md:mb-10 shrink-0">
-                            <Trophy className="text-amber-400" size={16} md:size={18} />
+                            {/* FIX: Removed invalid 'md:size' prop and moved responsive sizing to className using Tailwind classes */}
+                            <Trophy className="text-amber-400 md:size-[18px]" size={16} />
                             <span className="text-[8px] md:text-[10px] font-black uppercase tracking-[0.3em] md:tracking-[0.4em] text-white/50 italic">Sujetos Seleccionados:</span>
                         </div>
                         <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-2 md:space-y-4">
@@ -129,7 +129,8 @@ export const GiftCard: React.FC<GiftCardProps> = ({
                     <div className="flex-1 flex flex-col overflow-hidden">
                         <div className="px-6 py-3 md:px-10 md:py-6 flex justify-between items-center border-b border-white/5 bg-white/[0.02] shrink-0">
                             <span className="text-[8px] md:text-[11px] font-black uppercase tracking-[0.3em] md:tracking-[0.4em] text-white/40 flex items-center gap-2">
-                                <Activity size={12} md:size={14} /> Puja de Formulación ({gift.totalPoints})
+                                {/* FIX: Removed invalid 'md:size' prop and moved responsive sizing to className using Tailwind classes */}
+                                <Activity size={12} className="md:size-[14px]" /> Puja de Formulación ({gift.totalPoints})
                             </span>
                         </div>
                         <div className="flex-1 overflow-y-auto px-5 py-4 md:px-8 md:py-6 space-y-2 md:space-y-3 custom-scrollbar">
@@ -145,7 +146,8 @@ export const GiftCard: React.FC<GiftCardProps> = ({
                                 ))
                             ) : (
                                 <div className="h-full flex flex-col items-center justify-center opacity-10 gap-3 md:gap-6">
-                                    <FlaskConical size={32} md:size={64} strokeWidth={1} />
+                                    {/* FIX: Removed invalid 'md:size' prop and moved responsive sizing to className using Tailwind classes */}
+                                    <FlaskConical size={32} className="md:size-16" strokeWidth={1} />
                                     <p className="text-[8px] md:text-[11px] font-bold uppercase tracking-[0.3em] md:tracking-[0.5em] text-center max-w-[120px] md:max-w-[150px]">Terminal a la espera de instrucciones</p>
                                 </div>
                             )}

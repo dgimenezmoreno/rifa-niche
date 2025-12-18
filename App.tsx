@@ -11,10 +11,9 @@ import {
   Dna, Beaker, Activity, Loader2, Users, Wifi, WifiOff
 } from 'lucide-react';
 
-// NOTA: Estas variables deben estar en el panel de Environment Variables de tu hosting (Vercel/Netlify)
-// o hardcodeadas aquí para pruebas rápidas (no recomendado para producción).
-const SUPABASE_URL = process.env.SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
+// REQUERIDO: Pega aquí tus llaves de Supabase si no las tienes configuradas como variables de entorno.
+const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ecvhanpeesnclvzkvikg.supabase.co';
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjdmhhbnBlZXNuY2x2emt2aWtnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwMTMwNTgsImV4cCI6MjA4MTU4OTA1OH0.XpfBQbrvaBz9uMOWe76rx54VaCCK3xIMGTaIGqnEV1Q';
 
 const isSupabaseConfigured = !!SUPABASE_URL && !!SUPABASE_ANON_KEY;
 const supabase = isSupabaseConfigured ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
@@ -45,24 +44,18 @@ const App: React.FC = () => {
     stateRef.current = { phase, gifts, participants, currentRoundIndex, timeLeft, user, eventState, roomCode }; 
   }, [phase, gifts, participants, currentRoundIndex, timeLeft, user, eventState, roomCode]);
 
-  // FUNCIÓN DE BROADCAST (Solo Supabase)
   const broadcast = (payload: BroadcastEvent) => {
     if (supabaseChannelRef.current) {
-        console.log("Enviando evento:", payload.type);
         supabaseChannelRef.current.send({
             type: 'broadcast',
             event: 'raffle_event',
             payload
         });
-    } else {
-        console.warn("No hay canal activo para enviar broadcast.");
     }
   };
 
   const handleIncomingMessage = (payload: BroadcastEvent) => {
     const cs = stateRef.current;
-    console.log("Recibido evento:", payload.type);
-    
     switch (payload.type) {
       case 'PHASE_CHANGE':
         setPhase(payload.phase);
@@ -137,15 +130,13 @@ const App: React.FC = () => {
   const initConnection = (code: string): Promise<void> => {
     return new Promise((resolve) => {
         if (!supabase) {
-            console.error("Supabase no configurado. Verifica tus API Keys.");
+            setIsConnected(false);
             resolve();
             return;
         }
 
         const channelName = `raffle_room_${code}`;
-        console.log("Intentando conectar al canal:", channelName);
         
-        // Limpiar canal anterior si existe
         if (supabaseChannelRef.current) {
             supabase.removeChannel(supabaseChannelRef.current);
         }
@@ -158,16 +149,12 @@ const App: React.FC = () => {
             handleIncomingMessage(payload);
         })
         .subscribe((status) => {
-            console.log("Estado de suscripción Supabase:", status);
             if (status === 'SUBSCRIBED') {
                 setIsConnected(true);
                 supabaseChannelRef.current = sbChannel;
                 resolve();
             } else {
                 setIsConnected(false);
-                if (status === 'CHANNEL_ERROR') {
-                    console.error("Error al conectar con Supabase. Revisa CORS o API Keys.");
-                }
                 resolve();
             }
         });
@@ -194,7 +181,6 @@ const App: React.FC = () => {
     });
   };
 
-  // Efecto para el Timer (Solo Admin)
   useEffect(() => {
     let interval: any;
     if (user.isAdmin && phase === AppPhase.ROUND_ACTIVE) {
@@ -205,7 +191,6 @@ const App: React.FC = () => {
                 if (newVal <= 0) { clearInterval(interval); handleRoundLock(); return 0; }
                 return newVal;
             });
-            // Simulación de bots
             if (gifts[currentRoundIndex]) {
                 const botsToBet = simulateRoundBets(gifts[currentRoundIndex]);
                 botsToBet.forEach(botName => {
@@ -317,7 +302,6 @@ const App: React.FC = () => {
       broadcast({ type: 'PLACE_BET', giftId, userName: user.name });
   };
 
-  // RENDER: LOGIN
   if (phase === AppPhase.LOGIN) {
      return (
         <div className="min-h-screen flex items-center justify-center p-4 bg-[#0a0a0b] relative overflow-hidden">
@@ -367,7 +351,7 @@ const App: React.FC = () => {
                    <div className="space-y-8 animate-in slide-in-from-left duration-500 text-center">
                       <div className="bg-white/5 border border-white/10 p-8 rounded-[30px]">
                          <ShieldCheck size={40} className="mx-auto text-white/40 mb-4" />
-                         <p className="text-white font-bold text-sm uppercase tracking-widest leading-relaxed">¿Deseas iniciar un nuevo protocolo de sorteo?</p>
+                         <p className="text-white font-bold text-sm uppercase tracking-widest leading-relaxed">¿Deseas iniciar un nuevo protocolo?</p>
                       </div>
                       <div className="flex flex-col gap-3">
                         <button onClick={handleCreateAdmin} className="w-full bg-white text-black h-16 rounded-2xl flex items-center justify-between px-8 hover:shadow-2xl transition-all group">
@@ -384,7 +368,6 @@ const App: React.FC = () => {
       );
   }
 
-  // RENDER: APP MAIN
   return (
     <div className="min-h-screen bg-[#09090b] text-white font-maison flex flex-col relative overflow-hidden">
       {eventState && (
@@ -397,7 +380,6 @@ const App: React.FC = () => {
         />
       )}
 
-      {/* HEADER */}
       <header className="bg-[#18181b]/95 backdrop-blur-3xl border-b border-white/10 px-4 py-4 flex flex-row items-center justify-between z-40 shrink-0">
           <div className="flex items-center gap-2">
               <div className="w-7 h-7 bg-white flex items-center justify-center rounded-lg shrink-0"><FlaskConical size={14} className="text-black" /></div>
@@ -414,7 +396,7 @@ const App: React.FC = () => {
                 <div className="flex items-center gap-2 bg-[#27272a] px-3 py-2 rounded-xl border border-white/5">
                     <div className="flex gap-1">
                         {[...Array(INITIAL_CREDITS)].map((_, i) => (
-                            <div key={i} className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${i < user.remainingPoints ? 'bg-white' : 'bg-white/5'}`}></div>
+                            <div key={i} className={`w-1.5 h-1.5 rounded-full transition-all duration-500 ${i < user.remainingPoints ? 'bg-white shadow-[0_0_8px_rgba(255,255,255,0.4)]' : 'bg-white/5'}`}></div>
                         ))}
                     </div>
                 </div>
@@ -422,28 +404,28 @@ const App: React.FC = () => {
           </div>
       </header>
 
-      {/* CONTENT */}
       <div className="flex flex-1 overflow-hidden">
           <main className="flex-1 overflow-y-auto p-4 flex flex-col items-center">
               {phase === AppPhase.WAITING ? (
-                  <div className="w-full max-w-5xl animate-in fade-in duration-700 space-y-6">
+                  <div className="w-full max-w-5xl animate-in fade-in duration-700">
                       <div className="grid lg:grid-cols-2 gap-6">
                            <div className="bg-[#18181b] border border-white/10 rounded-[32px] p-8 md:p-12 flex flex-col justify-center text-left relative overflow-hidden">
                                <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter mb-4 leading-tight">
                                  {user.isAdmin ? "Control Root" : (
-                                    <>
+                                    <React.Fragment>
                                         Protocolo de<br/>
                                         <span className='text-white/20'>Espera</span>
-                                    </>
+                                    </React.Fragment>
                                  )}
                                </h1>
                                <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em] mb-8 leading-relaxed max-w-sm">
                                  {user.isAdmin 
-                                    ? "Sistema de sala " + roomCode + " estabilizado. Indica el código a los participantes." 
-                                    : "Conexión establecida con la sala " + roomCode + ". Esperando el inicio del sorteo por el administrador."}
+                                    ? `Sistema de sala ${roomCode} activo. Los participantes deben conectarse para iniciar.` 
+                                    : `Conexión establecida con la sala ${roomCode}. Esperando instrucciones...`}
                                </p>
+                               {!isConnected && <div className="mb-4 text-[9px] text-red-500 font-black uppercase animate-pulse">Sin conexión a Supabase. Verifica tus API Keys.</div>}
                                {user.isAdmin && (
-                                 <button onClick={handleStartGame} className="bg-white text-black h-16 rounded-2xl flex items-center justify-between px-8 hover:shadow-2xl transition-all group">
+                                 <button onClick={handleStartGame} disabled={!isConnected} className="bg-white text-black h-16 rounded-2xl flex items-center justify-between px-8 hover:shadow-2xl transition-all group disabled:opacity-20">
                                      <span className="font-black uppercase tracking-widest text-[10px]">Iniciar Sistema</span>
                                      <Play size={18} fill="black" />
                                  </button>
@@ -455,13 +437,9 @@ const App: React.FC = () => {
                                    <span className="text-3xl font-mono text-white/60">{participants.length}</span>
                                </div>
                                <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
-                                   {participants.length > 0 ? (
-                                       participants.map((p, i) => (
-                                          <div key={i} className="py-3 px-4 bg-white/5 border border-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white/50 truncate">
-                                              {p}
-                                          </div>
-                                       ))
-                                   ) : (
+                                   {participants.length > 0 ? participants.map((p, i) => (
+                                       <div key={i} className="py-3 px-4 bg-white/5 border border-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white/50 truncate">{p}</div>
+                                   )) : (
                                        <div className="col-span-2 py-8 text-center text-white/10 font-black uppercase tracking-widest text-[10px]">Esperando conexiones...</div>
                                    )}
                                </div>
@@ -488,7 +466,7 @@ const App: React.FC = () => {
                             currentUserName={user.name}
                         />
                     ) : (
-                        <div className="text-center bg-[#18181b] border border-white/20 p-12 rounded-[32px] max-w-2xl mx-auto">
+                        <div className="text-center bg-[#18181b] border border-white/20 p-12 rounded-[32px] max-w-2xl mx-auto shadow-2xl">
                             <h2 className="text-4xl font-black uppercase tracking-tighter mb-6 leading-none">Protocolo<br/><span className="text-white/10">Finalizado</span></h2>
                             <button onClick={() => window.location.reload()} className="bg-white text-black px-10 py-5 rounded-2xl font-black uppercase tracking-widest text-[10px]">Reiniciar Terminal</button>
                         </div>
@@ -498,7 +476,6 @@ const App: React.FC = () => {
           </main>
       </div>
 
-      {/* ADMIN CONTROLS FOOTER */}
       {user.isAdmin && currentGift && (
           <div className="bg-[#18181b] border-t border-white/20 p-4 z-50 shadow-2xl shrink-0 overflow-x-auto">
               <div className="max-w-7xl mx-auto flex flex-row items-center justify-between gap-4 min-w-[500px]">
@@ -516,11 +493,11 @@ const App: React.FC = () => {
                   <div className="flex gap-2">
                       {phase === AppPhase.ROUND_WAITING && (
                         <button onClick={handleStartRound} className="bg-white text-black px-6 h-10 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2">
-                            <Timer size={14} /> Abrir Puja
+                            <Timer size={14} /> Abrir Lote
                         </button>
                       )}
                       {phase === AppPhase.ROUND_ACTIVE && (
-                        <button onClick={handleRoundLock} className="bg-red-600 text-white px-6 h-10 rounded-xl text-[9px] font-black uppercase tracking-widest">Cerrar Puja</button>
+                        <button onClick={handleRoundLock} className="bg-red-600 text-white px-6 h-10 rounded-xl text-[9px] font-black uppercase tracking-widest">Cerrar Lote</button>
                       )}
                       {(phase === AppPhase.ROUND_LOCKED || phase === AppPhase.ROUND_REVEAL) && (
                            <div className="flex gap-2">
@@ -531,7 +508,7 @@ const App: React.FC = () => {
                                  <button onClick={() => handleAdminReveal(currentGift.id)} className="bg-white text-black px-6 h-10 rounded-xl text-[9px] font-black uppercase tracking-widest animate-pulse">Publicar Ganadores</button>
                                )}
                                {currentGift.isWinnerRevealed && (
-                                 <button onClick={handleNextRound} className="bg-white text-black px-6 h-10 rounded-xl text-[9px] font-black uppercase tracking-widest">Sig. Lote <ArrowRight size={14} className="inline ml-1"/></button>
+                                 <button onClick={handleNextRound} className="bg-white text-black px-6 h-10 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2">Sig. Lote <ArrowRight size={14} /></button>
                                )}
                            </div>
                       )}

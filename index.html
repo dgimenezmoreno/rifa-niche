@@ -1,0 +1,74 @@
+
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Niche Beauty Lab | Exclusive Protocol</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:opsz,wght@9..40,200;400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+      :root {
+        --font-maison: 'DM Sans', system-ui, sans-serif;
+        --bg-main: #09090b;
+        --bg-card: #18181b;
+        --bg-section: #27272a;
+        --accent-white: #fafafa;
+        --border-subtle: rgba(255, 255, 255, 0.15);
+      }
+
+      body {
+        font-family: var(--font-maison);
+        background-color: var(--bg-main);
+        color: var(--accent-white);
+        margin: 0;
+        overflow-x: hidden;
+        -webkit-font-smoothing: antialiased;
+        background-image: 
+            radial-gradient(circle at 50% -20%, #27272a 0%, transparent 60%),
+            url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+        background-blend-mode: normal, overlay;
+        background-size: 100% 100%, 250px;
+      }
+
+      .glass-panel {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(16px);
+        border: 1px solid var(--border-subtle);
+      }
+
+      .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+      .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
+      .custom-scrollbar::-webkit-scrollbar-thumb { 
+        background: rgba(255,255,255,0.2); 
+        border-radius: 10px;
+      }
+
+      @keyframes float {
+        0%, 100% { transform: translateY(0) scale(1); }
+        50% { transform: translateY(-15px) scale(1.05); }
+      }
+      .animate-float { animation: float 5s ease-in-out infinite; }
+
+      .text-glow {
+        text-shadow: 0 0 15px rgba(255,255,255,0.3);
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.45.4"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body>
+    <div id="root"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

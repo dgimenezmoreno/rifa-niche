@@ -1,14 +1,14 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { AppPhase, CurrentUser, Gift, BroadcastEvent, EventState } from './types';
+import { AppPhase, CurrentUser, Gift, BroadcastEvent, EventState, EventType } from './types';
 import { GiftCard } from './components/GiftCard';
 import { EventOverlay } from './components/EventOverlay';
 import { getStaticPrizes } from './services/geminiService';
 import { selectWinners } from './services/gameLogic';
 import { 
   Play, ShieldCheck, Timer, ArrowRight, FlaskConical, 
-  Loader2, Users, Wifi, WifiOff
+  Loader2, Users, Wifi, WifiOff, Copy, AlertCircle, QrCode
 } from 'lucide-react';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ecvhanpeesnclvzkvikg.supabase.co';
@@ -19,6 +19,9 @@ const supabase = isSupabaseConfigured ? createClient(SUPABASE_URL, SUPABASE_ANON
 
 const ROUND_DURATION = 35; 
 const INITIAL_CREDITS = 12;
+
+// Definición de retos para distribución automática
+const AUTO_EVENTS: EventType[] = ['CUTLERY', 'ROBBERY', 'PRESSURE', 'SINGING'];
 
 const App: React.FC = () => {
   const [phase, setPhase] = useState<AppPhase>(AppPhase.LOGIN);
@@ -34,14 +37,17 @@ const App: React.FC = () => {
   const [timeLeft, setTimeLeft] = useState(ROUND_DURATION);
   const [eventState, setEventState] = useState<EventState | null>(null);
   
+  // Seguimiento de retos completados para asegurar que no se repitan y se hagan todos
+  const [completedEvents, setCompletedEvents] = useState<EventType[]>([]);
+  
   const supabaseChannelRef = useRef<any>(null);
-  const stateRef = useRef({ phase, gifts, participants, currentRoundIndex, timeLeft, user, eventState, roomCode });
+  const stateRef = useRef({ phase, gifts, participants, currentRoundIndex, timeLeft, user, eventState, roomCode, completedEvents });
 
   const currentGift = gifts[currentRoundIndex];
 
   useEffect(() => { 
-    stateRef.current = { phase, gifts, participants, currentRoundIndex, timeLeft, user, eventState, roomCode }; 
-  }, [phase, gifts, participants, currentRoundIndex, timeLeft, user, eventState, roomCode]);
+    stateRef.current = { phase, gifts, participants, currentRoundIndex, timeLeft, user, eventState, roomCode, completedEvents }; 
+  }, [phase, gifts, participants, currentRoundIndex, timeLeft, user, eventState, roomCode, completedEvents]);
 
   const broadcast = (payload: BroadcastEvent) => {
     if (supabaseChannelRef.current) {
@@ -215,6 +221,7 @@ const App: React.FC = () => {
   const handleJoin = async () => {
     if (!userInputName.trim() || roomCode.length !== 4) return;
     setUser({ ...user, name: userInputName, isAdmin: false });
+    setParticipants([userInputName]); 
     setPhase(AppPhase.WAITING);
     await initConnection(roomCode);
     broadcast({ type: 'PLAYER_JOIN', name: userInputName });
@@ -225,9 +232,9 @@ const App: React.FC = () => {
     const generatedCode = Math.floor(1000 + Math.random() * 9000).toString();
     setRoomCode(generatedCode);
     setUser({ name: 'Root Admin', totalPoints: 0, remainingPoints: 0, isAdmin: true });
+    setParticipants(['Root Admin']);
     setPhase(AppPhase.WAITING);
     await initConnection(generatedCode);
-    setParticipants(['Root Admin']);
   };
 
   const handleStartGame = async () => {
@@ -254,11 +261,13 @@ const App: React.FC = () => {
   const handleStartRound = () => { setTimeLeft(ROUND_DURATION); setPhase(AppPhase.ROUND_ACTIVE); broadcast({ type: 'PHASE_CHANGE', phase: AppPhase.ROUND_ACTIVE }); };
   const handleRoundLock = () => { setPhase(AppPhase.ROUND_LOCKED); broadcast({ type: 'PHASE_CHANGE', phase: AppPhase.ROUND_LOCKED }); };
   
-  const triggerEvent = (type: 'CUTLERY' | 'ROBBERY' | 'PRESSURE' | 'SINGING') => {
+  const triggerEvent = (type: EventType) => {
     const newState: EventState = { type, step: 'STORY' };
     setEventState(newState);
     setPhase(AppPhase.EVENT_NARRATIVE);
     broadcast({ type: 'PHASE_CHANGE', phase: AppPhase.EVENT_NARRATIVE, eventState: newState });
+    // Marcar reto como completado
+    setCompletedEvents(prev => [...prev, type]);
   };
 
   const handleSpinRoulette = () => {
@@ -272,10 +281,7 @@ const App: React.FC = () => {
     }
 
     const pool = participants.filter(p => p !== 'Root Admin');
-    if (pool.length === 0) {
-        // No hay participantes, cancelamos el reto de identificación para no elegir al admin
-        return;
-    };
+    if (pool.length === 0) return;
     
     const target = pool[Math.floor(Math.random() * pool.length)];
     const newState: EventState = { ...eventState, step: 'ACTION', targetUser: target };
@@ -290,12 +296,33 @@ const App: React.FC = () => {
   };
 
   const handleNextRound = () => {
-      if (currentRoundIndex >= gifts.length - 1) {
+      const nextIndex = currentRoundIndex + 1;
+      
+      // Fin del juego
+      if (nextIndex >= gifts.length) {
           setPhase(AppPhase.FINISHED);
           broadcast({ type: 'PHASE_CHANGE', phase: AppPhase.FINISHED });
           return;
       }
-      const nextIndex = currentRoundIndex + 1;
+
+      // Lógica de activación automática de retos
+      const totalPrizes = gifts.length;
+      const totalEvents = AUTO_EVENTS.length;
+      const interval = Math.floor(totalPrizes / (totalEvents + 1));
+      
+      const pendingEvents = AUTO_EVENTS.filter(e => !completedEvents.includes(e));
+      
+      if (nextIndex > 0 && nextIndex % interval === 0 && pendingEvents.length > 0) {
+          triggerEvent(pendingEvents[0]);
+          return;
+      }
+
+      if (nextIndex === totalPrizes - 1 && pendingEvents.length > 0) {
+          triggerEvent(pendingEvents[0]);
+          return;
+      }
+
+      // Avance normal de ronda
       setCurrentRoundIndex(nextIndex);
       setPhase(AppPhase.ROUND_WAITING);
       broadcast({ type: 'ROUND_CHANGE', roundIndex: nextIndex });
@@ -318,7 +345,7 @@ const App: React.FC = () => {
   };
 
   const handlePlaceBet = (giftId: string, amount: number) => {
-      if (phase !== AppPhase.ROUND_ACTIVE) return;
+      if (phase !== AppPhase.ROUND_ACTIVE || user.isAdmin) return;
       if (amount > 0 && user.remainingPoints <= 0) return;
       const currentPoints = currentGift?.allocations.find(a => a.userName === user.name)?.points || 0;
       if (amount < 0 && currentPoints <= 0) return;
@@ -433,49 +460,86 @@ const App: React.FC = () => {
       <div className="flex flex-1 overflow-hidden">
           <main className="flex-1 overflow-y-auto p-4 flex flex-col items-center">
               {phase === AppPhase.WAITING ? (
-                  <div className="w-full max-w-5xl animate-in fade-in duration-700">
-                      <div className="grid lg:grid-cols-2 gap-6">
-                           <div className="bg-[#18181b] border border-white/10 rounded-[32px] p-8 md:p-12 flex flex-col justify-center text-left relative overflow-hidden">
-                               <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter mb-4 leading-tight">
-                                 {user.isAdmin ? "Control Root" : (
-                                    <React.Fragment>
-                                        Protocolo de<br/>
-                                        <span className='text-white/20'>Espera</span>
-                                    </React.Fragment>
-                                 )}
-                               </h1>
-                               <p className="text-white/40 text-[10px] font-bold uppercase tracking-[0.2em] mb-8 leading-relaxed max-w-sm">
+                  <div className="w-full max-w-6xl animate-in fade-in duration-700 pt-6">
+                      <div className="grid lg:grid-cols-5 gap-8">
+                           {/* Bloque de Código de Sala + QR */}
+                           <div className="lg:col-span-3 bg-[#18181b] border border-white/10 rounded-[40px] p-10 md:p-12 flex flex-col items-center justify-center text-center relative overflow-hidden shadow-2xl">
+                               <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-white/20 to-transparent"></div>
+                               <span className="text-[12px] md:text-[14px] font-black uppercase tracking-[0.6em] text-white/30 mb-6 shrink-0">Acceso a Terminal</span>
+                               
+                               <div className="flex flex-col md:flex-row items-center gap-10 md:gap-16 mb-8 w-full justify-center">
+                                   <div className="relative group cursor-pointer shrink-0" onClick={() => {navigator.clipboard.writeText(roomCode)}}>
+                                       <div className="absolute -inset-10 bg-white/5 blur-[80px] rounded-full opacity-50 group-hover:opacity-100 transition-opacity"></div>
+                                       <h2 className="text-[100px] md:text-[150px] font-mono font-black tracking-[-0.05em] text-white leading-none drop-shadow-[0_0_40px_rgba(255,255,255,0.1)] relative z-10">
+                                           {roomCode}
+                                       </h2>
+                                   </div>
+
+                                   {/* QR Code Section - Square enforcement */}
+                                   <div className="relative flex flex-col items-center gap-4 group shrink-0">
+                                       <div className="p-3 bg-white rounded-3xl shadow-2xl transition-transform group-hover:scale-105 duration-500 border-4 border-white/10 flex items-center justify-center aspect-square w-32 md:w-56">
+                                           <img 
+                                               src="https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=http://rifa-niche.vercel.app/" 
+                                               alt="Scan to Join"
+                                               className="w-full h-full rounded-xl object-contain"
+                                           />
+                                       </div>
+                                       <div className="flex items-center gap-2 text-white/40">
+                                            <QrCode size={16} />
+                                            <span className="text-[10px] font-black uppercase tracking-widest">Escanea para Entrar</span>
+                                       </div>
+                                   </div>
+                               </div>
+
+                               <p className="text-white/40 text-[11px] md:text-[13px] font-bold uppercase tracking-[0.3em] mb-10 leading-relaxed max-w-md shrink-0">
                                  {user.isAdmin 
-                                    ? `Sistema de sala ${roomCode} activo. Los participantes deben conectarse para iniciar.` 
-                                    : `Conexión establecida con la sala ${roomCode}. Esperando instrucciones...`}
+                                    ? `Proyecta este panel para que el equipo se una al protocolo.` 
+                                    : `Sincronización establecida. Esperando inicio de sesión root.`}
                                </p>
-                               {!isConnected && <div className="mb-4 text-[9px] text-red-500 font-black uppercase animate-pulse">Sin conexión a Supabase. Verifica tus API Keys.</div>}
+
                                {user.isAdmin && (
-                                 <button onClick={handleStartGame} disabled={!isConnected} className="bg-white text-black h-16 rounded-2xl flex items-center justify-between px-8 hover:shadow-2xl transition-all group disabled:opacity-20">
-                                     <span className="font-black uppercase tracking-widest text-[10px]">Iniciar Sistema</span>
-                                     <Play size={18} fill="black" />
+                                 <button onClick={handleStartGame} disabled={!isConnected} className="w-full max-w-sm bg-white text-black h-20 rounded-3xl flex items-center justify-between px-10 hover:shadow-[0_0_50px_rgba(255,255,255,0.4)] transition-all group disabled:opacity-20 border-b-4 border-black/20 shrink-0">
+                                     <span className="font-black uppercase tracking-[0.2em] text-[12px]">Inicializar Red</span>
+                                     <Play size={20} fill="black" className="group-hover:scale-125 transition-transform" />
                                  </button>
                                )}
                            </div>
-                           <div className="bg-[#27272a] border border-white/10 rounded-[32px] p-8">
-                               <div className="flex justify-between items-center mb-6">
-                                   <span className="text-[9px] font-black uppercase tracking-[0.5em] text-white/30">Personal en Sala</span>
-                                   <span className="text-3xl font-mono text-white/60">{participants.length}</span>
-                               </div>
-                               <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
-                                   {participants.length > 0 ? participants.map((p, i) => (
-                                       <div key={i} className={`py-3 px-4 bg-white/5 border border-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white/50 truncate ${p === 'Root Admin' ? 'opacity-30 italic' : ''}`}>{p}</div>
-                                   )) : (
-                                       <div className="col-span-2 py-8 text-center text-white/10 font-black uppercase tracking-widest text-[10px]">Esperando conexiones...</div>
-                                   )}
+
+                           <div className="lg:col-span-2 flex flex-col gap-6">
+                               <div className="bg-[#27272a] border border-white/10 rounded-[40px] p-10 flex flex-col h-full shadow-xl">
+                                   <div className="flex justify-between items-center mb-10 shrink-0">
+                                       <div className="flex flex-col">
+                                            <span className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 mb-1">Personal Detectado</span>
+                                            <span className="text-sm font-bold text-white/60">Sincronización en curso</span>
+                                       </div>
+                                       <div className="bg-[#18181b] w-16 h-16 rounded-2xl flex items-center justify-center border border-white/5">
+                                            <span className="text-3xl font-mono font-black text-white">{participants.length}</span>
+                                       </div>
+                                   </div>
+                                   <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 space-y-3 min-h-[300px]">
+                                       {participants.length > 0 ? participants.map((p, i) => (
+                                           <div key={i} className={`py-4 px-6 bg-white/5 border border-white/5 rounded-2xl text-[11px] font-black uppercase tracking-widest text-white/70 animate-in slide-in-from-right duration-300 flex justify-between items-center ${p === 'Root Admin' ? 'opacity-40 italic' : ''}`}>
+                                               <span className="truncate">{p}</span>
+                                               <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.5)]"></div>
+                                           </div>
+                                       )) : (
+                                           <div className="h-full flex flex-col items-center justify-center text-white/10 gap-4">
+                                                <Loader2 className="animate-spin" size={32} />
+                                                <span className="font-black uppercase tracking-widest text-[10px]">Esperando terminales...</span>
+                                           </div>
+                                       )}
+                                   </div>
                                </div>
                            </div>
                       </div>
                   </div>
               ) : phase === AppPhase.LOADING_GIFTS ? (
-                  <div className="flex flex-col items-center justify-center h-full">
-                      <Loader2 className="animate-spin text-white/40 mb-8" size={48} />
-                      <span className="text-[10px] font-black uppercase tracking-[0.6em] text-white/30">Sintetizando activos de I+D</span>
+                  <div className="flex flex-col items-center justify-center h-full min-h-[400px]">
+                      <div className="relative mb-10">
+                          <div className="absolute -inset-10 bg-white/5 blur-3xl animate-pulse"></div>
+                          <Loader2 className="animate-spin text-white/20" size={64} />
+                      </div>
+                      <span className="text-[11px] font-black uppercase tracking-[0.8em] text-white/20">Compilando Activos de Campaña</span>
                   </div>
               ) : (
                 <div className="w-full max-w-7xl animate-in fade-in zoom-in duration-500">
@@ -508,24 +572,24 @@ const App: React.FC = () => {
                   <div className="flex flex-row items-center gap-4">
                       <div className="pr-4 border-r border-white/10">
                           <span className="text-[8px] font-black uppercase tracking-[0.3em] text-white/30 mb-0.5 block">Campaña Activa</span>
-                          <span className="text-white font-mono text-xs font-bold uppercase">Lote {(currentRoundIndex + 1).toString().padStart(2, '0')}</span>
+                          <span className="text-white font-mono text-xs font-bold uppercase">
+                            Lote {(currentRoundIndex + 1).toString().padStart(2, '0')} / {gifts.length.toString().padStart(2, '0')}
+                          </span>
                       </div>
-                      <div className="flex gap-2">
-                          <button onClick={() => triggerEvent('CUTLERY')} className="bg-orange-500/10 border border-orange-500/30 text-orange-500 px-3 h-9 rounded-lg text-[8px] font-black uppercase tracking-widest">Cocina</button>
-                          <button onClick={() => triggerEvent('ROBBERY')} className="bg-red-600/10 border border-red-600/30 text-red-600 px-3 h-9 rounded-lg text-[8px] font-black uppercase tracking-widest">Robo</button>
-                          <button onClick={() => triggerEvent('PRESSURE')} className="bg-blue-600/10 border border-blue-600/30 text-blue-500 px-3 h-9 rounded-lg text-[8px] font-black uppercase tracking-widest">Presión</button>
-                          <button onClick={() => triggerEvent('SINGING')} className="bg-pink-600/10 border border-pink-600/30 text-pink-500 px-3 h-9 rounded-lg text-[8px] font-black uppercase tracking-widest">Villancico</button>
+                      <div className="flex items-center gap-2 bg-white/5 px-3 py-1.5 rounded-xl border border-white/5">
+                          <AlertCircle size={12} className="text-white/30" />
+                          <span className="text-[8px] font-black uppercase tracking-widest text-white/30">Retos Automáticos Programados</span>
                       </div>
                   </div>
 
                   <div className="flex gap-2">
                       {phase === AppPhase.ROUND_WAITING && (
-                        <button onClick={handleStartRound} className="bg-white text-black px-6 h-10 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2">
+                        <button onClick={handleStartRound} className="bg-white text-black px-6 h-10 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:shadow-xl transition-all">
                             <Timer size={14} /> Abrir Lote
                         </button>
                       )}
                       {phase === AppPhase.ROUND_ACTIVE && (
-                        <button onClick={handleRoundLock} className="bg-red-600 text-white px-6 h-10 rounded-xl text-[9px] font-black uppercase tracking-widest">Cerrar Lote</button>
+                        <button onClick={handleRoundLock} className="bg-red-600 text-white px-6 h-10 rounded-xl text-[9px] font-black uppercase tracking-widest hover:bg-red-500 transition-all">Cerrar Lote</button>
                       )}
                       {(phase === AppPhase.ROUND_LOCKED || phase === AppPhase.ROUND_REVEAL) && (
                            <div className="flex gap-2">

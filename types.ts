@@ -1,4 +1,3 @@
-
 export enum AppPhase {
   LOGIN = 'LOGIN',
   WAITING = 'WAITING',
@@ -11,11 +10,11 @@ export enum AppPhase {
   FINISHED = 'FINISHED'
 }
 
-export type EventType = 'CUTLERY' | 'ROBBERY';
+export type EventType = 'CUTLERY' | 'ROBBERY' | 'PRESSURE' | 'SINGING';
 
 export interface EventState {
   type: EventType;
-  step: 'STORY' | 'ACTION'; // Aligned with implementation
+  step: 'STORY' | 'ACTION';
   targetUser?: string;
   isSpinning?: boolean;
 }
@@ -50,7 +49,7 @@ export interface CurrentUser {
 export type BroadcastEvent = 
   | { type: 'PHASE_CHANGE'; phase: AppPhase; gifts?: Gift[]; currentRoundIndex?: number; eventState?: EventState }
   | { type: 'PLAYER_JOIN'; name: string }
-  | { type: 'PLACE_BET'; giftId: string; userName: string }
+  | { type: 'PLACE_BET'; giftId: string; userName: string; amount: number }
   | { type: 'GIFT_UPDATE'; gift: Gift }
   | { type: 'TIMER_UPDATE'; timeLeft: number }
   | { type: 'ROUND_CHANGE'; roundIndex: number }

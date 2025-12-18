@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { AppPhase, CurrentUser, Gift, BroadcastEvent, EventState } from './types';
@@ -10,7 +11,6 @@ import {
   Loader2, Users, Wifi, WifiOff
 } from 'lucide-react';
 
-// REQUERIDO: Pega aquí tus llaves de Supabase si no las tienes configuradas como variables de entorno.
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ecvhanpeesnclvzkvikg.supabase.co';
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVjdmhhbnBlZXNuY2x2emt2aWtnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYwMTMwNTgsImV4cCI6MjA4MTU4OTA1OH0.XpfBQbrvaBz9uMOWe76rx54VaCCK3xIMGTaIGqnEV1Q';
 
@@ -75,7 +75,7 @@ const App: React.FC = () => {
                 type: 'SYNC_RESPONSE',
                 phase: cs.phase,
                 gifts: cs.gifts,
-                participants: Array.from(new Set([...cs.participants, payload.name])),
+                participants: Array.from(new Set([...cs.participants, payload.name, cs.user.name])),
                 currentRoundIndex: cs.currentRoundIndex,
                 timeLeft: cs.timeLeft,
                 eventState: cs.eventState || undefined
@@ -83,7 +83,7 @@ const App: React.FC = () => {
         }
         break;
       case 'PLACE_BET':
-        handleIncomingBet(payload.giftId, payload.userName);
+        handleIncomingBet(payload.giftId, payload.userName, payload.amount);
         break;
       case 'GIFT_UPDATE':
         setGifts(prev => prev.map(g => g.id === payload.gift.id ? payload.gift : g));
@@ -97,8 +97,22 @@ const App: React.FC = () => {
         setTimeLeft(ROUND_DURATION);
         break;
       case 'EVENT_RESOLVED':
+        const target = cs.eventState?.targetUser;
+        const type = cs.eventState?.type;
         setPhase(AppPhase.ROUND_REVEAL);
         setEventState(null);
+
+        if (!payload.success) {
+            if (type === 'ROBBERY') {
+                if (cs.user.remainingPoints > 0) {
+                    setUser(prev => ({ ...prev, remainingPoints: Math.max(0, prev.remainingPoints - 1) }));
+                }
+            } else if (target === cs.user.name) {
+                if (cs.user.remainingPoints > 0) {
+                    setUser(prev => ({ ...prev, remainingPoints: Math.max(0, prev.remainingPoints - 1) }));
+                }
+            }
+        }
         break;
       case 'SYNC_REQUEST':
          if (cs.user.isAdmin) {
@@ -106,7 +120,7 @@ const App: React.FC = () => {
               type: 'SYNC_RESPONSE',
               phase: cs.phase,
               gifts: cs.gifts,
-              participants: cs.participants,
+              participants: Array.from(new Set([...cs.participants, cs.user.name])),
               currentRoundIndex: cs.currentRoundIndex,
               timeLeft: cs.timeLeft,
               eventState: cs.eventState || undefined
@@ -133,17 +147,13 @@ const App: React.FC = () => {
             resolve();
             return;
         }
-
         const channelName = `raffle_room_${code}`;
-        
         if (supabaseChannelRef.current) {
             supabase.removeChannel(supabaseChannelRef.current);
         }
-
         const sbChannel = supabase.channel(channelName, { 
             config: { broadcast: { self: false } } 
         });
-        
         sbChannel.on('broadcast', { event: 'raffle_event' }, ({ payload }: { payload: BroadcastEvent }) => {
             handleIncomingMessage(payload);
         })
@@ -160,7 +170,7 @@ const App: React.FC = () => {
     });
   };
 
-  const handleIncomingBet = (giftId: string, userName: string) => {
+  const handleIncomingBet = (giftId: string, userName: string, amount: number) => {
     setGifts(prevGifts => {
         const index = prevGifts.findIndex(g => g.id === giftId);
         if (index === -1) return prevGifts;
@@ -168,13 +178,20 @@ const App: React.FC = () => {
         const gift = { ...updatedGifts[index] };
         const newAllocations = [...gift.allocations];
         const existingIndex = newAllocations.findIndex(a => a.userName === userName);
+        
         if (existingIndex > -1) {
-             newAllocations[existingIndex] = { ...newAllocations[existingIndex], points: newAllocations[existingIndex].points + 1 };
-        } else {
-            newAllocations.push({ userName, points: 1, isCurrentUser: userName === stateRef.current.user.name });
+             const newPoints = newAllocations[existingIndex].points + amount;
+             if (newPoints <= 0) {
+                 newAllocations.splice(existingIndex, 1);
+             } else {
+                 newAllocations[existingIndex] = { ...newAllocations[existingIndex], points: newPoints };
+             }
+        } else if (amount > 0) {
+            newAllocations.push({ userName, points: amount, isCurrentUser: userName === stateRef.current.user.name });
         }
+        
         gift.allocations = newAllocations;
-        gift.totalPoints += 1;
+        gift.totalPoints = newAllocations.reduce((acc, curr) => acc + curr.points, 0);
         updatedGifts[index] = gift;
         return updatedGifts;
     });
@@ -190,11 +207,10 @@ const App: React.FC = () => {
                 if (newVal <= 0) { clearInterval(interval); handleRoundLock(); return 0; }
                 return newVal;
             });
-            // SE HAN ELIMINADO LOS BOTS AQUÍ
         }, 1000);
     }
     return () => clearInterval(interval);
-  }, [user.isAdmin, phase, currentRoundIndex, gifts]);
+  }, [user.isAdmin, phase, currentRoundIndex]);
 
   const handleJoin = async () => {
     if (!userInputName.trim() || roomCode.length !== 4) return;
@@ -211,6 +227,7 @@ const App: React.FC = () => {
     setUser({ name: 'Root Admin', totalPoints: 0, remainingPoints: 0, isAdmin: true });
     setPhase(AppPhase.WAITING);
     await initConnection(generatedCode);
+    setParticipants(['Root Admin']);
   };
 
   const handleStartGame = async () => {
@@ -237,7 +254,7 @@ const App: React.FC = () => {
   const handleStartRound = () => { setTimeLeft(ROUND_DURATION); setPhase(AppPhase.ROUND_ACTIVE); broadcast({ type: 'PHASE_CHANGE', phase: AppPhase.ROUND_ACTIVE }); };
   const handleRoundLock = () => { setPhase(AppPhase.ROUND_LOCKED); broadcast({ type: 'PHASE_CHANGE', phase: AppPhase.ROUND_LOCKED }); };
   
-  const triggerEvent = (type: 'CUTLERY' | 'ROBBERY') => {
+  const triggerEvent = (type: 'CUTLERY' | 'ROBBERY' | 'PRESSURE' | 'SINGING') => {
     const newState: EventState = { type, step: 'STORY' };
     setEventState(newState);
     setPhase(AppPhase.EVENT_NARRATIVE);
@@ -246,12 +263,22 @@ const App: React.FC = () => {
 
   const handleSpinRoulette = () => {
     if (!eventState || !user.isAdmin) return;
-    const activeAllocations = currentGift?.allocations.map(a => a.userName) || [];
-    const pool = participants.length > 0 ? participants : (activeAllocations.length > 0 ? activeAllocations : []);
-    if (pool.length === 0) return; // No hay nadie a quien elegir
+    
+    if (eventState.type === 'ROBBERY') {
+        const newState: EventState = { ...eventState, step: 'ACTION' };
+        setEventState(newState);
+        broadcast({ type: 'EVENT_STEP_UPDATE', eventState: newState });
+        return;
+    }
+
+    const pool = participants.filter(p => p !== 'Root Admin');
+    if (pool.length === 0) {
+        // No hay participantes, cancelamos el reto de identificación para no elegir al admin
+        return;
+    };
     
     const target = pool[Math.floor(Math.random() * pool.length)];
-    const newState: EventState = { ...eventState, step: 'ACTION', targetUser: eventState.type === 'CUTLERY' ? target : undefined };
+    const newState: EventState = { ...eventState, step: 'ACTION', targetUser: target };
     setEventState(newState);
     broadcast({ type: 'EVENT_STEP_UPDATE', eventState: newState });
   };
@@ -290,11 +317,15 @@ const App: React.FC = () => {
     });
   };
 
-  const handlePlaceBet = (giftId: string) => {
-      if (phase !== AppPhase.ROUND_ACTIVE || user.remainingPoints <= 0) return;
-      setUser(prev => ({ ...prev, remainingPoints: prev.remainingPoints - 1 }));
-      handleIncomingBet(giftId, user.name);
-      broadcast({ type: 'PLACE_BET', giftId, userName: user.name });
+  const handlePlaceBet = (giftId: string, amount: number) => {
+      if (phase !== AppPhase.ROUND_ACTIVE) return;
+      if (amount > 0 && user.remainingPoints <= 0) return;
+      const currentPoints = currentGift?.allocations.find(a => a.userName === user.name)?.points || 0;
+      if (amount < 0 && currentPoints <= 0) return;
+
+      setUser(prev => ({ ...prev, remainingPoints: prev.remainingPoints - amount }));
+      handleIncomingBet(giftId, user.name, amount);
+      broadcast({ type: 'PLACE_BET', giftId, userName: user.name, amount });
   };
 
   if (phase === AppPhase.LOGIN) {
@@ -307,7 +338,7 @@ const App: React.FC = () => {
              <div className="bg-[#18181b] border border-white/20 p-8 md:p-12 rounded-[40px] shadow-[0_0_100px_rgba(0,0,0,0.8)] relative overflow-hidden">
                  <div className="text-center mb-10">
                      <span className="text-[10px] font-black uppercase tracking-[0.4em] text-white/30 block mb-4">Niche Beauty Lab Protocol</span>
-                     <h2 className="text-4xl md:text-6xl font-black tracking-tighter text-white uppercase leading-none">The<br/><span className="text-white/20">Active List</span></h2>
+                     <h2 className="text-4xl md:text-6xl font-black tracking-tighter text-white uppercase leading-none">Niche<br/><span className="text-white/20">Xmas Giveaway</span></h2>
                  </div>
 
                  {!loginMode ? (
@@ -433,7 +464,7 @@ const App: React.FC = () => {
                                </div>
                                <div className="grid grid-cols-1 xs:grid-cols-2 gap-2">
                                    {participants.length > 0 ? participants.map((p, i) => (
-                                       <div key={i} className="py-3 px-4 bg-white/5 border border-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white/50 truncate">{p}</div>
+                                       <div key={i} className={`py-3 px-4 bg-white/5 border border-white/5 rounded-xl text-[10px] font-black uppercase tracking-widest text-white/50 truncate ${p === 'Root Admin' ? 'opacity-30 italic' : ''}`}>{p}</div>
                                    )) : (
                                        <div className="col-span-2 py-8 text-center text-white/10 font-black uppercase tracking-widest text-[10px]">Esperando conexiones...</div>
                                    )}
@@ -473,7 +504,7 @@ const App: React.FC = () => {
 
       {user.isAdmin && currentGift && (
           <div className="bg-[#18181b] border-t border-white/20 p-4 z-50 shadow-2xl shrink-0 overflow-x-auto">
-              <div className="max-w-7xl mx-auto flex flex-row items-center justify-between gap-4 min-w-[500px]">
+              <div className="max-w-7xl mx-auto flex flex-row items-center justify-between gap-4 min-w-[700px]">
                   <div className="flex flex-row items-center gap-4">
                       <div className="pr-4 border-r border-white/10">
                           <span className="text-[8px] font-black uppercase tracking-[0.3em] text-white/30 mb-0.5 block">Campaña Activa</span>
@@ -482,6 +513,8 @@ const App: React.FC = () => {
                       <div className="flex gap-2">
                           <button onClick={() => triggerEvent('CUTLERY')} className="bg-orange-500/10 border border-orange-500/30 text-orange-500 px-3 h-9 rounded-lg text-[8px] font-black uppercase tracking-widest">Cocina</button>
                           <button onClick={() => triggerEvent('ROBBERY')} className="bg-red-600/10 border border-red-600/30 text-red-600 px-3 h-9 rounded-lg text-[8px] font-black uppercase tracking-widest">Robo</button>
+                          <button onClick={() => triggerEvent('PRESSURE')} className="bg-blue-600/10 border border-blue-600/30 text-blue-500 px-3 h-9 rounded-lg text-[8px] font-black uppercase tracking-widest">Presión</button>
+                          <button onClick={() => triggerEvent('SINGING')} className="bg-pink-600/10 border border-pink-600/30 text-pink-500 px-3 h-9 rounded-lg text-[8px] font-black uppercase tracking-widest">Villancico</button>
                       </div>
                   </div>
 

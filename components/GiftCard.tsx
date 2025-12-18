@@ -1,6 +1,7 @@
+
 import React from 'react';
 import { Gift, AppPhase } from '../types';
-import { Lock, Trophy, Zap, FlaskConical, Beaker, Activity } from 'lucide-react';
+import { Lock, Trophy, Zap, FlaskConical, Beaker, Activity, Minus, Plus } from 'lucide-react';
 
 interface GiftCardProps {
   gift: Gift;
@@ -9,7 +10,7 @@ interface GiftCardProps {
   canAllocate: boolean;
   timeLeft: number;
   isAdmin: boolean;
-  onAllocate: (giftId: string) => void;
+  onAllocate: (giftId: string, amount: number) => void;
   onAdminReveal?: (giftId: string) => void;
   currentUserName: string;
 }
@@ -27,7 +28,6 @@ export const GiftCard: React.FC<GiftCardProps> = ({
 }) => {
   const isRevealPhase = phase === AppPhase.ROUND_REVEAL || phase === AppPhase.ROUND_LOCKED;
   const isBettingPhase = phase === AppPhase.ROUND_ACTIVE;
-
   const canAdminReveal = isAdmin && isRevealPhase && (!gift.isContentRevealed || !gift.isWinnerRevealed);
 
   return (
@@ -38,7 +38,7 @@ export const GiftCard: React.FC<GiftCardProps> = ({
           canAdminReveal ? 'cursor-pointer hover:border-white/40 group/card ring-1 ring-white/10' : ''
         }`}
       >
-        {/* LADO IZQUIERDO: IMAGEN/ESTADO DEL REGALO */}
+        {/* LADO IZQUIERDO: ESTADO DEL REGALO */}
         <div className="w-full lg:w-7/12 relative overflow-hidden flex items-center justify-center p-6 md:p-12 bg-gradient-to-br from-[#27272a] to-[#18181b] border-b lg:border-b-0 lg:border-r border-white/10">
              <div className="absolute inset-0 opacity-5 pointer-events-none" style={{backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)', backgroundSize: '30px 30px'}}></div>
              <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.05)_0%,transparent_70%)]"></div>
@@ -135,7 +135,6 @@ export const GiftCard: React.FC<GiftCardProps> = ({
                                 <Activity size={14} /> Puja de Formulación ({gift.totalPoints})
                             </span>
                         </div>
-                        {/* ESTA ES LA ÚNICA PARTE QUE HACE SCROLL */}
                         <div className="flex-1 overflow-y-auto px-5 py-4 md:px-8 md:py-6 space-y-2 md:space-y-3 custom-scrollbar">
                             {gift.allocations.length > 0 ? (
                                 gift.allocations.sort((a,b) => b.points - a.points).map((alloc, idx) => (
@@ -173,21 +172,40 @@ export const GiftCard: React.FC<GiftCardProps> = ({
                              </div>
                         </div>
 
-                        <button
-                            onClick={(e) => { e.stopPropagation(); onAllocate(gift.id); }}
-                            disabled={!canAllocate || !isBettingPhase}
-                            className={`w-full h-16 md:h-24 rounded-2xl md:rounded-3xl flex items-center justify-between px-6 md:px-10 transition-all group overflow-hidden relative border-2 ${
-                                canAllocate && isBettingPhase 
-                                ? 'bg-white text-black border-white hover:shadow-[0_0_50px_rgba(255,255,255,0.3)] active:scale-95' 
-                                : 'bg-[#27272a] text-white/10 border-white/5 grayscale cursor-not-allowed opacity-50'
-                            }`}
-                        >
-                            <div className="flex flex-col items-start relative z-10 text-left">
-                              <span className="font-black uppercase tracking-[0.1em] md:tracking-[0.25em] text-[10px] md:text-[12px]">Inyectar Crédito Lab</span>
-                              <span className="text-[7px] md:text-[9px] font-bold opacity-40 uppercase tracking-widest mt-0.5 md:mt-1">Protocolo: Inmediato</span>
-                            </div>
-                            <Zap size={22} className={`relative z-10 transition-transform ${isBettingPhase ? 'group-hover:scale-125 group-hover:rotate-12 fill-current' : ''}`} />
-                        </button>
+                        <div className="flex gap-2">
+                            {/* BOTÓN RESTAR */}
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onAllocate(gift.id, -1); }}
+                                disabled={userPointsAllocated <= 0 || !isBettingPhase}
+                                className={`w-20 h-16 md:h-24 rounded-2xl md:rounded-3xl flex items-center justify-center transition-all border-2 ${
+                                    userPointsAllocated > 0 && isBettingPhase 
+                                    ? 'bg-[#27272a] text-white border-white/20 hover:border-white/40 active:scale-95' 
+                                    : 'bg-[#18181b] text-white/5 border-white/5 cursor-not-allowed opacity-30'
+                                }`}
+                            >
+                                <Minus size={24} />
+                            </button>
+
+                            {/* BOTÓN SUMAR (PRINCIPAL) */}
+                            <button
+                                onClick={(e) => { e.stopPropagation(); onAllocate(gift.id, 1); }}
+                                disabled={!canAllocate || !isBettingPhase}
+                                className={`flex-1 h-16 md:h-24 rounded-2xl md:rounded-3xl flex items-center justify-between px-6 md:px-10 transition-all group overflow-hidden relative border-2 ${
+                                    canAllocate && isBettingPhase 
+                                    ? 'bg-white text-black border-white hover:shadow-[0_0_50px_rgba(255,255,255,0.3)] active:scale-95' 
+                                    : 'bg-[#27272a] text-white/10 border-white/5 grayscale cursor-not-allowed opacity-50'
+                                }`}
+                            >
+                                <div className="flex flex-col items-start relative z-10 text-left">
+                                  <span className="font-black uppercase tracking-[0.1em] md:tracking-[0.25em] text-[10px] md:text-[12px]">Añadir Crédito</span>
+                                  <span className="text-[7px] md:text-[9px] font-bold opacity-40 uppercase tracking-widest mt-0.5 md:mt-1">Inyección de Activo</span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Plus size={18} className="relative z-10" />
+                                    <Zap size={22} className={`relative z-10 transition-transform ${isBettingPhase ? 'group-hover:scale-125 group-hover:rotate-12 fill-current' : ''}`} />
+                                </div>
+                            </button>
+                        </div>
                     </div>
                 ) : (
                     <div className="flex flex-col items-center justify-center py-4 md:py-8 opacity-20">

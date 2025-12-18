@@ -9,7 +9,7 @@ import { selectWinners } from './services/gameLogic';
 import { 
   Play, ShieldCheck, Timer, ArrowRight, FlaskConical, 
   Loader2, Users, Wifi, WifiOff, QrCode,
-  Trophy, CheckCircle2, RefreshCw, FileText
+  Trophy, CheckCircle2, RefreshCw, FileText, Smartphone
 } from 'lucide-react';
 
 const SUPABASE_URL = process.env.SUPABASE_URL || 'https://ecvhanpeesnclvzkvikg.supabase.co';
@@ -118,16 +118,21 @@ const App: React.FC = () => {
   };
 
   const handleEventOutcome = (success: boolean) => {
-    // Si estábamos en una fase de narrativa de evento, volvemos a la rifa pero del siguiente lote
-    // ya que el evento se dispara ANTES de empezar el lote objetivo.
+    // Obtenemos el índice actual antes de limpiar
+    const cs = stateRef.current;
     setPhase(AppPhase.ROUND_WAITING);
     setEventState(null);
     if (success) {
         setUser(prev => ({ ...prev, remainingPoints: prev.remainingPoints + 2 }));
     }
-    // Si somos admin, notificamos a todos del cambio de fase
+    // IMPORTANTE: Al terminar el evento, emitimos el cambio de fase incluyendo el currentRoundIndex
+    // para evitar que los clientes vuelvan al lote anterior.
     if (user.isAdmin) {
-      broadcast({ type: 'PHASE_CHANGE', phase: AppPhase.ROUND_WAITING });
+      broadcast({ 
+        type: 'PHASE_CHANGE', 
+        phase: AppPhase.ROUND_WAITING, 
+        currentRoundIndex: cs.currentRoundIndex 
+      });
     }
   };
 
@@ -279,7 +284,7 @@ const App: React.FC = () => {
   const handleNextRound = () => {
     if (currentRoundIndex + 1 < gifts.length) {
       const nextIndex = currentRoundIndex + 1;
-      // Actualizamos el índice localmente de inmediato para que el evento sepa a qué lote pertenece
+      // Actualizamos el índice localmente
       setCurrentRoundIndex(nextIndex);
       
       if (TRIGGER_INDICES.includes(nextIndex)) {
@@ -302,25 +307,25 @@ const App: React.FC = () => {
      return (
         <div className="min-h-screen flex items-center justify-center p-4 bg-black">
           <div className="w-full max-w-xl">
-             <div className="bg-black border-[4px] border-white p-12 text-center">
-                 <h2 className="text-5xl font-black text-white uppercase mb-12 leading-none">Niche<br/>Xmas Giveaway</h2>
+             <div className="bg-black border-[4px] border-white p-6 md:p-12 text-center">
+                 <h2 className="text-4xl md:text-5xl font-black text-white uppercase mb-8 md:mb-12 leading-none">Niche<br/>Xmas Giveaway</h2>
                  {!loginMode ? (
-                   <div className="flex flex-col gap-6">
-                      <button onClick={() => setLoginMode('USER')} className="bg-white text-black py-8 font-black uppercase text-xl border-[4px] border-white">Entrar como Participante</button>
-                      <button onClick={() => setLoginMode('ADMIN')} className="bg-black text-white py-8 font-black uppercase text-xl border-[4px] border-white">Crear Sala (Admin)</button>
+                   <div className="flex flex-col gap-4 md:gap-6">
+                      <button onClick={() => setLoginMode('USER')} className="bg-white text-black py-6 md:py-8 font-black uppercase text-lg md:text-xl border-[4px] border-white">Entrar como Participante</button>
+                      <button onClick={() => setLoginMode('ADMIN')} className="bg-black text-white py-6 md:py-8 font-black uppercase text-lg md:text-xl border-[4px] border-white">Crear Sala (Admin)</button>
                    </div>
                  ) : loginMode === 'USER' ? (
-                   <div className="space-y-6">
-                      <input type="text" value={userInputName} onChange={(e) => setUserInputName(e.target.value)} placeholder="NOMBRE" className="w-full bg-black border-[4px] border-white p-6 text-xl font-black text-white uppercase placeholder:text-white/20"/>
-                      <input type="text" maxLength={4} value={roomCode} onChange={(e) => setRoomCode(e.target.value.replace(/\D/g, ''))} placeholder="CÓDIGO" className="w-full bg-black border-[4px] border-white p-6 text-4xl font-black text-center text-white tracking-[0.5em]"/>
-                      <button onClick={handleJoin} className="w-full bg-white text-black py-8 font-black uppercase text-xl">Conectarse</button>
-                      <button onClick={() => setLoginMode(null)} className="text-white/50 uppercase font-bold text-sm">Volver</button>
+                   <div className="space-y-4 md:space-y-6">
+                      <input type="text" value={userInputName} onChange={(e) => setUserInputName(e.target.value)} placeholder="NOMBRE" className="w-full bg-black border-[3px] border-white p-4 md:p-6 text-lg md:text-xl font-black text-white uppercase placeholder:text-white/20 outline-none focus:bg-white focus:text-black transition-all"/>
+                      <input type="text" maxLength={4} value={roomCode} onChange={(e) => setRoomCode(e.target.value.replace(/\D/g, ''))} placeholder="CÓDIGO" className="w-full bg-black border-[3px] border-white p-4 md:p-6 text-3xl md:text-4xl font-black text-center text-white tracking-[0.5em] outline-none focus:bg-white focus:text-black transition-all"/>
+                      <button onClick={handleJoin} className="w-full bg-white text-black py-6 md:py-8 font-black uppercase text-lg md:text-xl">Conectarse</button>
+                      <button onClick={() => setLoginMode(null)} className="text-white/50 uppercase font-bold text-xs md:text-sm">Volver</button>
                    </div>
                  ) : (
-                   <div className="space-y-8">
-                      <p className="text-white text-xl font-black uppercase">¿Generar nueva sala de sorteo?</p>
-                      <button onClick={handleCreateAdmin} className="w-full bg-white text-black py-8 font-black uppercase text-xl">Generar Sala Root</button>
-                      <button onClick={() => setLoginMode(null)} className="text-white/50 uppercase font-bold text-sm">Cancelar</button>
+                   <div className="space-y-6 md:space-y-8">
+                      <p className="text-white text-lg md:text-xl font-black uppercase">¿Generar nueva sala de sorteo?</p>
+                      <button onClick={handleCreateAdmin} className="w-full bg-white text-black py-6 md:py-8 font-black uppercase text-lg md:text-xl">Generar Sala Root</button>
+                      <button onClick={() => setLoginMode(null)} className="text-white/50 uppercase font-bold text-xs md:text-sm">Cancelar</button>
                    </div>
                  )}
              </div>
@@ -331,88 +336,111 @@ const App: React.FC = () => {
 
   if (phase === AppPhase.FINISHED) {
     return (
-      <div className="min-h-screen bg-black p-12 overflow-y-auto">
-          <div className="max-w-4xl mx-auto space-y-12">
-              <div className="text-center bg-white text-black p-10 border-[6px] border-white">
-                  <h1 className="text-7xl font-black uppercase leading-none mb-4">Informe Final</h1>
-                  <p className="text-xl font-bold uppercase tracking-widest">Protocolo de Distribución Completado</p>
+      <div className="min-h-screen bg-black p-6 md:p-12 overflow-y-auto">
+          <div className="max-w-4xl mx-auto space-y-8 md:space-y-12">
+              <div className="text-center bg-white text-black p-6 md:p-10 border-[6px] border-white">
+                  <h1 className="text-4xl md:text-7xl font-black uppercase leading-none mb-4">Informe Final</h1>
+                  <p className="text-sm md:text-xl font-bold uppercase tracking-widest">Protocolo de Distribución Completado</p>
               </div>
-              <div className="grid gap-6">
+              <div className="grid gap-4 md:gap-6">
                   {gifts.map((g, i) => (
-                      <div key={i} className="border-[4px] border-white p-8 flex items-center gap-8">
-                          <div className="text-7xl">{g.emoji}</div>
+                      <div key={i} className="border-[4px] border-white p-4 md:p-8 flex items-center gap-4 md:gap-8">
+                          <div className="text-4xl md:text-7xl">{g.emoji}</div>
                           <div className="flex-1">
-                              <h3 className="text-3xl font-black uppercase text-white">{g.revealedName}</h3>
-                              <div className="flex flex-wrap gap-3 mt-4">
+                              <h3 className="text-xl md:text-3xl font-black uppercase text-white">{g.revealedName}</h3>
+                              <div className="flex flex-wrap gap-2 md:gap-3 mt-2 md:mt-4">
                                   {g.winners?.map((w, j) => (
-                                      <span key={j} className="bg-white text-black px-4 py-2 font-black uppercase text-lg">{w}</span>
+                                      <span key={j} className="bg-white text-black px-3 py-1 md:px-4 md:py-2 font-black uppercase text-sm md:text-lg">{w}</span>
                                   ))}
                               </div>
                           </div>
                       </div>
                   ))}
               </div>
-              <button onClick={() => window.location.reload()} className="w-full bg-white text-black py-8 font-black uppercase text-2xl border-[6px] border-white">Reiniciar Sistema</button>
+              <button onClick={() => window.location.reload()} className="w-full bg-white text-black py-6 md:py-8 font-black uppercase text-xl md:text-2xl border-[6px] border-white">Reiniciar Sistema</button>
           </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col">
+    <div className="min-h-screen bg-black text-white flex flex-col overflow-hidden">
       {eventState && <EventOverlay eventState={eventState} isAdmin={user.isAdmin} participants={participants} onSpinRoulette={handleSpinRoulette} onResolve={handleResolveEvent} />}
       
-      <header className="bg-white text-black px-4 md:px-8 py-4 md:py-6 flex items-center justify-between shrink-0 border-b-[6px] border-black">
+      <header className="bg-white text-black px-4 md:px-8 py-3 md:py-6 flex items-center justify-between shrink-0 border-b-[4px] md:border-b-[6px] border-black z-50">
           <div className="flex items-center gap-2 md:gap-4">
-              <FlaskConical size={24} className="md:w-8 md:h-8" />
-              <span className="text-xl md:text-4xl font-black uppercase tracking-tighter">Niche Lab</span>
+              <FlaskConical size={20} className="md:w-8 md:h-8" />
+              <span className="text-lg md:text-4xl font-black uppercase tracking-tighter">Niche Lab</span>
           </div>
           <div className="flex items-center gap-3 md:gap-6">
-              <div className="text-sm md:text-2xl font-black font-mono border-[2px] md:border-[3px] border-black px-3 md:px-6 py-1 md:py-2">SALA: {roomCode}</div>
-              {isConnected ? <Wifi size={20} /> : <WifiOff size={20} className="text-red-600" />}
+              <div className="text-xs md:text-2xl font-black font-mono border-[2px] md:border-[3px] border-black px-2 md:px-6 py-1 md:py-2">SALA: {roomCode}</div>
+              {isConnected ? <Wifi size={18} /> : <WifiOff size={18} className="text-red-600" />}
           </div>
       </header>
 
-      <main className="flex-1 flex flex-col items-center justify-center p-4 md:p-8 overflow-hidden">
+      <main className="flex-1 flex flex-col items-center justify-center p-3 md:p-8 overflow-hidden relative">
           {phase === AppPhase.WAITING ? (
-              <div className="w-full max-w-7xl flex flex-col lg:flex-row gap-6 md:gap-8 items-stretch h-full overflow-y-auto">
-                  <div className="flex-1 bg-black border-[4px] md:border-[6px] border-white p-6 md:p-16 text-center flex flex-col justify-center">
-                      <span className="text-xs md:text-xl font-black uppercase tracking-[0.5em] text-white/40 block mb-4 md:mb-6">Acceso</span>
-                      <h2 className="text-6xl md:text-[160px] font-black leading-none mb-6 md:mb-10">{roomCode}</h2>
-                      <div className="flex justify-center mb-6 md:mb-10">
-                         <div className="w-32 h-32 md:w-64 md:h-64 bg-white p-2 md:p-4 border-[4px] md:border-[6px] border-white">
+              <div className="w-full max-w-7xl h-full flex flex-col lg:flex-row gap-4 md:gap-8 items-stretch overflow-hidden">
+                  {/* Panel Principal Lobby */}
+                  <div className="flex-1 bg-black border-[4px] md:border-[6px] border-white p-4 md:p-12 text-center flex flex-col justify-center overflow-y-auto custom-scrollbar">
+                      <div className="mb-4 md:mb-6">
+                         <span className="text-[10px] md:text-xl font-black uppercase tracking-[0.4em] md:tracking-[0.5em] text-white/40 block mb-1">Acceso</span>
+                         <h2 className="text-5xl md:text-[160px] font-black leading-none mb-4 md:mb-10 text-white">{roomCode}</h2>
+                      </div>
+                      
+                      <div className="flex flex-col md:flex-row items-center justify-center gap-6 md:gap-12 mb-6 md:mb-12">
+                         <div className="w-32 h-32 md:w-64 md:h-64 bg-white p-2 md:p-4 border-[4px] md:border-[6px] border-white shrink-0">
                             <img src={`https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(window.location.href)}`} className="w-full h-full" alt="QR"/>
                          </div>
+                         <div className="hidden md:flex flex-col text-left max-w-xs gap-4">
+                            <div className="flex items-center gap-3">
+                               <div className="w-10 h-10 bg-white text-black flex items-center justify-center font-black">1</div>
+                               <span className="text-xs font-bold uppercase">Escanea el código QR</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                               <div className="w-10 h-10 bg-white text-black flex items-center justify-center font-black">2</div>
+                               <span className="text-xs font-bold uppercase tracking-tight">Introduce tu nombre y el código {roomCode}</span>
+                            </div>
+                         </div>
                       </div>
+
                       {user.isAdmin && (
-                        <button onClick={handleStartGame} className="w-full bg-white text-black py-6 md:py-10 text-xl md:text-3xl font-black uppercase border-[4px] md:border-[6px] border-white">Empezar</button>
+                        <button onClick={handleStartGame} className="w-full bg-white text-black py-4 md:py-10 text-lg md:text-3xl font-black uppercase border-[4px] md:border-[6px] border-white hover:bg-black hover:text-white transition-all shrink-0">Empezar Sistema</button>
+                      )}
+                      
+                      {!user.isAdmin && (
+                        <div className="bg-white/10 p-4 border-[2px] border-white/20 animate-pulse">
+                           <Smartphone size={24} className="mx-auto mb-2 opacity-50"/>
+                           <span className="text-[10px] font-black uppercase tracking-widest text-white/60">Esperando Inicio del Admin...</span>
+                        </div>
                       )}
                   </div>
                   
-                  <div className="w-full lg:w-96 bg-black border-[4px] md:border-[6px] border-white p-4 md:p-8 flex flex-col">
+                  {/* Panel Lateral Participantes */}
+                  <div className="w-full lg:w-96 bg-black border-[4px] md:border-[6px] border-white p-4 md:p-8 flex flex-col max-h-[40vh] lg:max-h-none">
                       <div className="flex justify-between items-center mb-4 border-b-[2px] md:border-b-[3px] border-white pb-3 md:pb-4">
-                         <span className="text-sm md:text-xl font-black uppercase">Participantes</span>
-                         <span className="bg-white text-black px-2 md:px-3 py-1 font-black text-lg md:text-2xl">{participants.length}</span>
+                         <span className="text-xs md:text-xl font-black uppercase">Personal en Sala</span>
+                         <span className="bg-white text-black px-2 md:px-3 py-1 font-black text-sm md:text-2xl">{participants.length}</span>
                       </div>
-                      <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2">
+                      <div className="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-2">
                          {participants.filter(p => p !== 'Root Admin').map((p, i) => (
-                            <div key={i} className="border-[2px] md:border-[3px] border-white p-3 md:p-4 font-black uppercase text-sm md:text-lg text-white">
+                            <div key={i} className="border-[2px] md:border-[3px] border-white p-2 md:p-4 font-black uppercase text-[10px] md:text-lg text-white truncate">
                                {p}
                             </div>
                          ))}
                          {participants.filter(p => p !== 'Root Admin').length === 0 && (
-                            <div className="h-full flex flex-col items-center justify-center opacity-20 text-center py-10">
-                               <Users size={32} className="mb-2" />
-                               <span className="font-black uppercase tracking-widest text-[10px]">Esperando terminales...</span>
+                            <div className="h-full flex flex-col items-center justify-center opacity-20 text-center py-6">
+                               <Users size={24} className="md:w-10 md:h-10 mb-2" />
+                               <span className="font-black uppercase tracking-widest text-[8px] md:text-[10px]">Sin terminales activos</span>
                             </div>
                          )}
                       </div>
                   </div>
               </div>
           ) : phase === AppPhase.LOADING_GIFTS ? (
-              <div className="text-center space-y-8">
-                  <Loader2 className="animate-spin mx-auto text-white" size={60} />
-                  <span className="text-xl font-black uppercase tracking-[0.5em]">Compilando...</span>
+              <div className="text-center space-y-6 md:space-y-8">
+                  <Loader2 className="animate-spin mx-auto text-white w-12 h-12 md:w-20 md:h-20" />
+                  <span className="text-sm md:text-2xl font-black uppercase tracking-[0.4em] md:tracking-[0.5em]">Actualizando Inventario...</span>
               </div>
           ) : (
              <div className="w-full h-full">
@@ -435,20 +463,20 @@ const App: React.FC = () => {
       </main>
 
       {user.isAdmin && currentGift && (
-        <footer className="bg-white text-black p-4 md:p-6 border-t-[6px] border-black flex flex-col md:flex-row justify-between items-center gap-4">
-            <div className="text-xl md:text-2xl font-black uppercase">Lote {(currentRoundIndex + 1)} / {gifts.length}</div>
+        <footer className="bg-white text-black p-3 md:p-6 border-t-[4px] md:border-t-[6px] border-black flex flex-col md:flex-row justify-between items-center gap-3 md:gap-4 z-50">
+            <div className="text-lg md:text-2xl font-black uppercase">LOTE {(currentRoundIndex + 1)} / {gifts.length}</div>
             <div className="flex flex-wrap justify-center gap-2 md:gap-4 w-full md:w-auto">
                 {phase === AppPhase.ROUND_WAITING && (
-                  <button onClick={() => { setPhase(AppPhase.ROUND_ACTIVE); broadcast({ type: 'PHASE_CHANGE', phase: AppPhase.ROUND_ACTIVE }); }} className="flex-1 md:flex-none bg-black text-white px-6 md:px-10 py-3 md:py-4 font-black uppercase text-sm md:text-xl">Abrir Rifa</button>
+                  <button onClick={() => { setPhase(AppPhase.ROUND_ACTIVE); broadcast({ type: 'PHASE_CHANGE', phase: AppPhase.ROUND_ACTIVE }); }} className="flex-1 md:flex-none bg-black text-white px-6 md:px-10 py-3 md:py-4 font-black uppercase text-xs md:text-xl border-[2px] border-black hover:bg-white hover:text-black transition-all">Abrir Rifa</button>
                 )}
                 {phase === AppPhase.ROUND_ACTIVE && (
-                  <button onClick={() => { setPhase(AppPhase.ROUND_LOCKED); broadcast({ type: 'PHASE_CHANGE', phase: AppPhase.ROUND_LOCKED }); }} className="flex-1 md:flex-none bg-black text-white px-6 md:px-10 py-3 md:py-4 font-black uppercase text-sm md:text-xl">Cerrar Rifa</button>
+                  <button onClick={() => { setPhase(AppPhase.ROUND_LOCKED); broadcast({ type: 'PHASE_CHANGE', phase: AppPhase.ROUND_LOCKED }); }} className="flex-1 md:flex-none bg-black text-white px-6 md:px-10 py-3 md:py-4 font-black uppercase text-xs md:text-xl border-[2px] border-black hover:bg-white hover:text-black transition-all">Cerrar Rifa</button>
                 )}
                 {(phase === AppPhase.ROUND_LOCKED || phase === AppPhase.ROUND_REVEAL) && (
                     <div className="flex gap-2 md:gap-4 w-full md:w-auto">
-                        {!currentGift.isContentRevealed && <button onClick={() => handleAdminReveal(currentGift.id)} className="flex-1 md:flex-none bg-black text-white px-6 md:px-10 py-3 md:py-4 font-black uppercase text-sm md:text-xl">Revelar</button>}
-                        {currentGift.isContentRevealed && !currentGift.isWinnerRevealed && <button onClick={() => handleAdminReveal(currentGift.id)} className="flex-1 md:flex-none bg-black text-white px-6 md:px-10 py-3 md:py-4 font-black uppercase text-sm md:text-xl">Ganadores</button>}
-                        {currentGift.isWinnerRevealed && <button onClick={handleNextRound} className="flex-1 md:flex-none bg-black text-white px-6 md:px-10 py-3 md:py-4 font-black uppercase text-sm md:text-xl">Siguiente</button>}
+                        {!currentGift.isContentRevealed && <button onClick={() => handleAdminReveal(currentGift.id)} className="flex-1 md:flex-none bg-black text-white px-4 md:px-10 py-3 md:py-4 font-black uppercase text-xs md:text-xl border-[2px] border-black hover:bg-white hover:text-black transition-all">Revelar</button>}
+                        {currentGift.isContentRevealed && !currentGift.isWinnerRevealed && <button onClick={() => handleAdminReveal(currentGift.id)} className="flex-1 md:flex-none bg-black text-white px-4 md:px-10 py-3 md:py-4 font-black uppercase text-xs md:text-xl border-[2px] border-black hover:bg-white hover:text-black transition-all">Ganadores</button>}
+                        {currentGift.isWinnerRevealed && <button onClick={handleNextRound} className="flex-1 md:flex-none bg-black text-white px-4 md:px-10 py-3 md:py-4 font-black uppercase text-xs md:text-xl border-[2px] border-black hover:bg-white hover:text-black transition-all">Siguiente</button>}
                     </div>
                 )}
             </div>
